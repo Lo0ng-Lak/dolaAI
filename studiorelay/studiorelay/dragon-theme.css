@@ -1,0 +1,220 @@
+/* DragonBMT — visual skin only. IDs and JS wiring stay untouched. */
+
+:root {
+    --canvas: #080705;
+    --surface: #12100b;
+    --surface-raised: #1b1710;
+    --surface-hover: #261f14;
+    --border: #3a3120;
+    --border-strong: #5a4a28;
+    --text: #f4ead4;
+    --text-soft: #d8cba8;
+    --muted: #9a8b6a;
+    --muted-strong: #6f6448;
+    --accent: #e8b44a;
+    --accent-hover: #f3c96a;
+    --accent-soft: rgba(232, 180, 74, 0.14);
+    --success: #7dba5a;
+    --success-soft: rgba(125, 186, 90, 0.12);
+    --danger: #d4543c;
+    --danger-soft: rgba(212, 84, 60, 0.12);
+    --warning: #e8b44a;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+}
+
+html,
+body {
+    background:
+        radial-gradient(1200px 480px at -10% -20%, rgba(232, 180, 74, 0.1), transparent 52%),
+        linear-gradient(180deg, #0c0a07 0%, #080705 100%) !important;
+}
+
+.popup-container {
+    gap: 12px;
+    padding: 12px;
+}
+
+.header {
+    min-height: 64px;
+    padding: 10px 12px;
+    border: 1px solid #3a3120;
+    border-left: 3px solid #e8b44a;
+    border-radius: 0;
+    background: #100e0a;
+    box-shadow: none;
+}
+
+.avatar-img,
+.lock-avatar-img {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #e8b44a;
+    border-radius: 2px;
+    background: #080705;
+}
+
+.title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #f4ead4;
+}
+
+.version-badge {
+    color: #e8b44a;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.active-badge {
+    border: 1px solid #e8b44a;
+    border-radius: 0;
+    background: rgba(232, 180, 74, 0.1);
+    color: #e8b44a;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    border: none;
+    border-bottom: 1px solid #3a3120;
+    border-radius: 0;
+    background: transparent;
+}
+
+.nav-btn {
+    flex: 1;
+    padding: 10px 4px 8px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: #9a8b6a;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.nav-btn:hover {
+    background: rgba(232, 180, 74, 0.06);
+    color: #f4ead4;
+}
+
+.nav-btn.active {
+    border-color: transparent;
+    border-bottom: 2px solid #e8b44a;
+    background: transparent;
+    color: #e8b44a;
+    box-shadow: none;
+}
+
+.prompt-input-card,
+.status-card,
+.duration-selector-card,
+.bulk-account-opener,
+.lock-card,
+.setting-item,
+.image-picker-card {
+    border-radius: 0 !important;
+    border-color: #3a3120 !important;
+    background: #12100b !important;
+}
+
+.btn-primary,
+#btn-open-multiple-accounts,
+#btn-import-profile,
+#btn-add-bulk-prompts,
+.action-button {
+    border: 1px solid #e8b44a !important;
+    border-radius: 2px !important;
+    background: #e8b44a !important;
+    color: #080705 !important;
+    box-shadow: none !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.btn-primary:hover,
+#btn-open-multiple-accounts:hover,
+#btn-import-profile:hover,
+#btn-add-bulk-prompts:hover,
+.action-button:hover {
+    background: #f3c96a !important;
+    border-color: #f3c96a !important;
+}
+
+.action-button .button-copy strong,
+.action-button .button-copy small,
+.button-copy strong {
+    color: #080705 !important;
+}
+
+.button-copy small {
+    color: rgba(8, 7, 5, 0.7) !important;
+}
+
+.btn-mini-primary,
+.filter-pill.active,
+.dur-pill.active,
+.ratio-pill.active {
+    border-color: #e8b44a !important;
+    background: rgba(232, 180, 74, 0.14) !important;
+    color: #e8b44a !important;
+}
+
+.empty-state,
+.image-picker-card {
+    border-style: dashed !important;
+    border-color: #5a4a28 !important;
+    background: rgba(232, 180, 74, 0.05) !important;
+}
+
+.dragon-info {
+    padding: 8px 10px;
+    border: 1px solid #3a3120;
+    border-left: 3px solid #e8b44a;
+    background: #12100b;
+    color: #d8cba8;
+    font-size: 10.5px;
+    line-height: 1.45;
+}
+
+.dragon-info strong {
+    display: block;
+    margin-bottom: 2px;
+    color: #e8b44a;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.footer-sedan {
+    border: 1px solid #3a3120;
+    border-left: 3px solid #e8b44a;
+    border-radius: 0;
+    background: #12100b;
+    color: #d8cba8;
+    letter-spacing: 0.04em;
+}
+
+.terminal {
+    border-radius: 0;
+    border-color: #3a3120;
+    background: #050403;
+    color: #c8b48a;
+}
+
+.switch input:checked + .slider {
+    background: #e8b44a !important;
+    border-color: #e8b44a !important;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #5a4a28;
+}

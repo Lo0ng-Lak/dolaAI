@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src='popup-config.js'></script>
+    <meta charset="UTF-8">
+    <title>DragonBMT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="dragon-theme.css">
+</head>
+<body>
+    <div class="popup-container">
+        
+        <!-- Header -->
+        <div class="header">
+            <div class="brand">
+                <img src="brand-icon.svg" class="avatar-img" alt="DragonBMT">
+                <div class="brand-copy">
+                    <h1 class="title">DragonBMT</h1>
+                    <span class="version-badge">Ép 30/60s · video không watermark</span>
+                </div>
+            </div>
+            <div class="active-badge" id="header-active-account" title="Tài khoản đang dùng">
+                Sẵn sàng
+            </div>
+        </div>
+        <div class="dragon-info">
+            <strong>DragonBMT</strong>
+            Ép 30s / 60s trên Fast · Tải video gốc không watermark · Sedan gửi lệnh xong tắt Chrome
+        </div>
+
+        <!-- 🔒 LOCK SCREEN VIEW (Shown when unactivated) -->
+        <div class="tab-content" id="view-license-lock" style="display: none;">
+            <div class="lock-card">
+                <div class="lock-mark">
+                    <img src="brand-icon.svg" class="lock-avatar-img" alt="DragonBMT">
+                </div>
+                <p class="eyebrow" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 4px 0;">DragonBMT</p>
+                <h2 class="lock-title">Kích hoạt thiết bị</h2>
+                <p class="lock-sub">This license is linked to your current device. Copy the device ID and use the key provided by your administrator.</p>
+                
+                <div class="machine-id-container">
+                    <span class="machine-id-label">YOUR DEVICE HARDWARE ID:</span>
+                    <div class="machine-id-box" id="display-machine-id">GENERATING...</div>
+                    <button class="btn-copy-id" id="btn-copy-machine-id">📋 Copy Device ID</button>
+                </div>
+
+                <div class="key-input-container">
+                    <span class="machine-id-label">PASTE LICENSE KEY:</span>
+                    <input type="text" id="input-license-key" class="input-text" placeholder="CTB-VIP-XXXX-XXXX-XXXX-XXXX">
+                    <button class="btn-primary" id="btn-activate-license" style="margin-top: 8px;">
+                        ⚡ Activate License
+                    </button>
+                    <div id="activation-error" class="activation-error"></div>
+                </div>
+
+                <div class="contact-support-box">
+                    <span>Need a license key? Contact your administrator for access.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN UNLOCKED INTERFACE -->
+        <div id="main-unlocked-ui">
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="nav-btn active" id="tab-prompts">Prompt</button>
+                <button class="nav-btn" id="tab-images" aria-controls="view-images">Ảnh</button>
+                <button class="nav-btn" id="tab-accounts">Tài khoản</button>
+                <button class="nav-btn" id="tab-settings">Cài đặt</button>
+                <button class="nav-btn" id="tab-logs">Nhật ký</button>
+            </div>
+
+            <!-- TAB 2: BULK PROMPTS -->
+            <div class="tab-content" id="view-prompts">
+                <div class="section-header-row">
+                    <span class="section-title">Prompt hàng loạt (<span id="prompt-counter">0</span>)</span>
+                    <div style="display: flex; gap: 4px;">
+                        <input type="file" id="file-upload-prompts" accept=".csv, .txt, .text, .json" style="display: none;">
+                        <button id="btn-clear-prompts" class="btn-mini-delete" title="Clear all prompts">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Filters -->
+                <div class="search-filter-row">
+                    <div class="filter-pills-row">
+                        <button class="filter-pill active" data-filter="all">Tất cả (<span id="count-all">0</span>)</button>
+                        <button class="filter-pill" data-filter="queued">Chờ (<span id="count-queued">0</span>)</button>
+                        <button class="filter-pill" data-filter="done">Xong (<span id="count-done">0</span>)</button>
+                    </div>
+                </div>
+
+                <!-- Fast Paste Box -->
+                <div class="prompt-input-card">
+                    <textarea id="textarea-quick-prompts" class="input-textarea" placeholder="Dán prompt, mỗi dòng một câu..."></textarea>
+                    <button id="btn-add-bulk-prompts" class="btn-primary" style="margin-top: 6px; padding: 6px;">
+                        Thêm prompt vào danh sách
+                    </button>
+                    <button id="btn-hit-create-video" class="btn-primary action-button" style="margin-top: 6px;" title="Arm sync mode & click ANY button on page to mirror across all tabs">
+                        <span class="button-copy">
+                            <strong>Hit create video button</strong>
+                            <small>Arm sync mode & click ANY button on page to mirror across all tabs</small>
+                        </span>
+                    </button>
+
+                    <!-- BULK DOWNLOAD MODE CARD -->
+                    <div class="bulk-mode-control-card" style="margin-top: 8px; padding: 8px 10px; background: rgba(46, 230, 200, 0.08); border: 1px solid rgba(46, 230, 200, 0.3); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <div style="display: flex; flex-direction: column; gap: 1px;">
+                            <div style="font-size: 11px; font-weight: 700; color: #b8fff0; display: flex; align-items: center; gap: 4px;">
+                                <span>📦 Bulk Download Mode</span>
+                            </div>
+                            <span style="font-size: 9.5px; color: #94a3b8;">Pause auto-download & fetch chat ZIP</span>
+                        </div>
+                        <label class="switch" title="Toggle Bulk Download Mode">
+                            <input type="checkbox" id="toggle-bulk-mode">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <button id="btn-scroll-chat-videos" class="btn-primary action-button" style="margin-top: 6px; background: linear-gradient(135deg, #4f46e5, #7c3aed);" title="Auto-scroll current Dola chat to top to load and extract all past videos">
+                        <span class="button-copy">
+                            <strong>📜 Load All Chat Videos (Auto-Scroll)</strong>
+                            <small>Scrolls chat upwards to extract past videos</small>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Numbered Prompts List / Clickable Dropzone -->
+                <div class="prompts-list" id="prompts-container">
+                    <div class="empty-state" id="prompts-empty-dropzone" title="Click to upload prompt file">📁 Click here to select prompt file (.txt, .csv, text)...</div>
+                </div>
+            </div>
+
+            <!-- TAB 3: BULK IMAGES -->
+            <div class="tab-content hidden" id="view-images" aria-hidden="true">
+                <div class="section-header-row">
+                    <span class="section-title">Ảnh hàng loạt (<span id="images-counter">0</span>)</span>
+                    <div class="image-header-actions">
+                        <input type="file" id="file-upload-images" multiple accept="image/*" hidden>
+                        <button id="btn-trigger-upload-images" class="btn-mini-primary" type="button" title="Select multiple images">
+                            📁 Select Images
+                        </button>
+                        <button id="btn-clear-images" class="btn-mini-delete" type="button" title="Clear all images">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="search-filter-row">
+                    <div class="filter-pills-row" id="image-filter-pills">
+                        <button class="filter-pill active" type="button" data-image-filter="all">All (<span id="image-count-all">0</span>)</button>
+                        <button class="filter-pill" type="button" data-image-filter="queued">⚪ Queued (<span id="image-count-queued">0</span>)</button>
+                        <button class="filter-pill" type="button" data-image-filter="done">✅ Done (<span id="image-count-done">0</span>)</button>
+                    </div>
+                </div>
+
+                <div class="image-picker-card" id="image-picker-dropzone" role="button" tabindex="0" aria-label="Select or drop multiple images">
+                    <span class="image-picker-icon" aria-hidden="true">🖼️</span>
+                    <span class="image-picker-copy">
+                        <strong>Select or drop images</strong>
+                        <small>JPG, PNG, WEBP, GIF or AVIF · maximum 25 MB each</small>
+                    </span>
+                </div>
+
+                <button id="btn-open-image-upload-options" class="btn-primary image-queue-upload-button" type="button">
+                    <span class="button-copy">
+                        <strong>Upload queued images</strong>
+                        <small>Choose active tab or serial upload across all tabs</small>
+                    </span>
+                </button>
+
+                <div id="image-upload-status" class="image-upload-status" role="status" aria-live="polite"></div>
+
+                <div class="image-gallery-drag-hint">
+                    ↗ Drag any photo anywhere on Dola · click a photo for verified upload
+                </div>
+
+                <div class="images-list" id="images-container">
+                    <div class="empty-state" id="images-empty-dropzone">📁 Select multiple images to build the upload queue.</div>
+                </div>
+            </div>
+
+            <!-- TAB 4: BULK ACCOUNTS -->
+            <div class="tab-content hidden" id="view-accounts">
+                <div class="section-header-row">
+                    <span class="section-title">Tài khoản (<span id="accounts-counter">0</span>)</span>
+                    <div style="display: flex; gap: 4px;">
+                        <input type="file" id="file-upload-accounts" multiple accept=".json, .txt, .netscape, .csv" style="display: none;">
+                        <button id="btn-trigger-upload-accounts" class="btn-mini-primary" title="Import multiple cookie files from Desktop/PC">
+                            📁 Upload Files
+                        </button>
+                        <button id="btn-capture-session" class="btn-mini-primary" title="Capture active tab logged in account">
+                            + Capture Tab
+                        </button>
+                        <button id="btn-clear-all-accounts" class="btn-mini-delete" title="Clear all accounts">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class='bulk-account-opener'>
+                    <div class='bulk-account-opener-copy'>
+                        <span class='bulk-account-opener-title'>OPEN MULTIPLE ACCOUNTS</span>
+                    </div>
+                    <div class='bulk-account-opener-controls'>
+                        <input type='number' id='input-bulk-account-count' class='bulk-account-count' min='1' step='1' value='1' inputmode='numeric' aria-label='Number of account tabs to open'>
+                        <button id='btn-open-multiple-accounts' class='btn-primary bulk-account-open-button'>Open Tabs</button>
+                    </div>
+                    <div id='bulk-account-open-status' class='bulk-account-open-status' role='status' aria-live='polite'>Checking available accounts...</div>
+                </div>
+
+                <!-- Quick Paste Box for Single/Multi Account Cookies -->
+                <div class="prompt-input-card">
+                    <input type="text" id="input-profile-name" class="input-text" placeholder="Account Name (leave blank to auto-generate #01, #02...)" style="margin-bottom: 5px;">
+                    <textarea id="input-profile-cookies" class="input-textarea" placeholder="Paste JSON array, Netscape format, or multi-account cookies..."></textarea>
+                    <button id="btn-import-profile" class="btn-primary" style="margin-top: 6px; padding: 6px;">
+                        ➕ Add / Import Account Cookies
+                    </button>
+                </div>
+
+                <!-- Numbered & Styled Accounts List -->
+                <div class="profiles-list" id="profiles-container">
+                    <div class="empty-state">No saved accounts yet. Click "Upload Files" or "Capture Tab" above.</div>
+                </div>
+            </div>
+
+            <!-- TAB 5: SETTINGS -->
+            <div class="tab-content hidden" id="view-settings">
+                <div class="settings-list">
+                    <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 4px; background: rgba(46, 230, 200, 0.08); border-color: rgba(46, 230, 200, 0.3);">
+                        <div style="font-size: 11px; font-weight: bold; color: #e8b44a;">Trạng thái DragonBMT</div>
+                        <div id="settings-license-info" style="font-size: 11px; color: #d8cba8;">DragonBMT đang hoạt động</div>
+                    </div>
+                    <label class="setting-item">
+                        <span>Ép thời lượng video</span>
+                        <select id="sel-duration" class="select-box">
+                            <option value="60">60 giây</option>
+                            <option value="30" selected>30 giây</option>
+                            <option value="25">25 Seconds (Super HD)</option>
+                            <option value="20">20 Seconds (Pro HD)</option>
+                            <option value="15">15 Seconds (Fast HD)</option>
+                            <option value="10">10 Seconds (Standard Default)</option>
+                        </select>
+                    </label>
+                    <label class="setting-item">
+                        <span>Daily Limit Auto-Account Rotator</span>
+                        <input type="checkbox" id="chk-autorotate" checked>
+                    </label>
+                    <label class="setting-item">
+                        <span>Auto-Advance to Next Prompt on Send</span>
+                        <input type="checkbox" id="chk-autonext" checked>
+                    </label>
+                    <label class="setting-item">
+                        <span>Tự tải video khi xong</span>
+                        <input type="checkbox" id="chk-auto-dl" checked>
+                    </label>
+                    <label class="setting-item">
+                        <span>📦 Bulk Download Mode (Auto-Pause & ZIP)</span>
+                        <input type="checkbox" id="chk-bulk-mode">
+                    </label>
+                    <label class="setting-item">
+                        <span>Smart Brand & Stunt Auto-Sanitizer</span>
+                        <input type="checkbox" id="chk-safety" checked>
+                    </label>
+                </div>
+            </div>
+
+            <!-- TAB 6: LOGS -->
+            <div class="tab-content hidden" id="view-logs">
+                <div class="terminal" id="terminal">
+                    [Sẵn sàng] DragonBMT<br>
+                    [Duration] Ép 30s / 60s<br>
+                    [Download] Tải video gốc không watermark<br>
+                    [Sedan] Gửi xong Chrome tắt, tiến trình nằm trong tool.
+                </div>
+            </div>
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-sedan">DragonBMT · ép duration · tải video gốc · Sedan điều khiển</div>
+        </footer>
+
+        <!-- CUSTOM THEME CONFIRM DIALOG MODAL -->
+        <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description">
+            <div class="confirm-dialog-icon" aria-hidden="true">⚠️</div>
+            <div class="confirm-dialog-body">
+                <h2 id="confirm-dialog-title">Confirm Action</h2>
+                <p id="confirm-dialog-description">This action cannot be undone.</p>
+            </div>
+            <div class="confirm-dialog-actions">
+                <button class="btn-secondary" id="confirm-dialog-cancel" type="button">Cancel</button>
+                <button class="btn-danger" id="confirm-dialog-accept" type="button">Continue</button>
+            </div>
+        </dialog>
+
+        <dialog class="image-upload-dialog" id="image-upload-dialog" aria-labelledby="image-upload-dialog-title" aria-describedby="image-upload-dialog-description">
+            <div class="image-upload-dialog-preview-wrap">
+                <img id="image-upload-dialog-preview" class="image-upload-dialog-preview" alt="Selected image preview">
+            </div>
+            <div class="image-upload-dialog-copy">
+                <h2 id="image-upload-dialog-title">Upload image</h2>
+                <p id="image-upload-dialog-name"></p>
+                <p id="image-upload-dialog-description">Choose where this image queue should be uploaded.</p>
+            </div>
+            <div class="image-upload-dialog-actions">
+                <button class="btn-secondary" id="image-upload-dialog-cancel" type="button">Cancel</button>
+                <button class="btn-secondary image-upload-one" id="image-upload-active-tab" type="button">Current tab</button>
+                <button class="btn-primary image-upload-all" id="image-upload-all-tabs" type="button">All tabs serially</button>
+            </div>
+        </dialog>
+    </div>
+    <script src="popup.js"></script>
+    <script src='popup-bulk-accounts.js'></script>
+    <script src='popup-paragraph-prompts.js'></script>
+    <script src="ui-polish.js"></script>
+    <script src="popup-image-uploads.js"></script>
+    <script src="popup-chat-scroll.js"></script>
+</body>
+</html>

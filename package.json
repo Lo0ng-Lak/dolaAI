@@ -1,0 +1,95 @@
+{
+  "name": "seedance-manager",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Seedance 2.5 multi-task manager for Dola",
+  "author": "Seedance Manager",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "predev": "node scripts/free-ports.js",
+    "dev": "concurrently -k \"node server/cli.js\" \"vite\" \"wait-on http://127.0.0.1:5288 && cross-env VITE_DEV_SERVER=http://127.0.0.1:5288 electron .\"",
+    "dev:web": "concurrently -k \"node server/cli.js\" \"vite\"",
+    "dev:ui": "vite",
+    "dev:server": "node server/cli.js",
+    "dev:desktop": "concurrently -k \"node server/cli.js\" \"vite\" \"wait-on http://127.0.0.1:5288 && cross-env VITE_DEV_SERVER=http://127.0.0.1:5288 electron .\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dist": "vite build && electron-builder --win"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.5",
+    "express": "^5.2.1",
+    "ffmpeg-static": "^5.3.0",
+    "lucide-react": "^1.47.0",
+    "playwright": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.6.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.10.7",
+    "electron-builder": "^26.15.3",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "vite": "^8.3.0",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.seedance.manager",
+    "productName": "Seedance Manager",
+    "directories": {
+      "output": "C:/Users/Admin/AppData/Local/SeedanceManager-build"
+    },
+    "files": [
+      "dist/**/*",
+      "server/**/*",
+      "shared/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "studiorelay/studiorelay",
+        "to": "studiorelay",
+        "filter": [
+          "**/*.js",
+          "**/*.css",
+          "**/*.html",
+          "**/*.png",
+          "**/*.svg",
+          "manifest.json"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/playwright/**",
+      "node_modules/playwright-core/**",
+      "node_modules/ffmpeg-static/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "SeedanceManager-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

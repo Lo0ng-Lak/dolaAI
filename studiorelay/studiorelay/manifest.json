@@ -1,0 +1,98 @@
+{
+    "manifest_version": 3,
+    "name": "DragonBMT",
+    "version": "2.0",
+    "description": "DragonBMT — ép 30/60s, tải video không watermark, quản lý prompt và tài khoản Dola.",
+    "icons": {
+        "16": "icon16.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    },
+    "permissions": [
+        "sidePanel",
+        "storage",
+        "cookies",
+        "downloads",
+        "offscreen",
+        "tabs",
+        "webNavigation",
+        "declarativeNetRequest",
+        "declarativeNetRequestWithHostAccess"
+    ],
+    "side_panel": {
+        "default_path": "popup.html"
+    },
+    "host_permissions": [
+        "*://*.dola.com/*",
+        "*://*.seaart.ai/*",
+        "*://*.byteintl.com/*",
+        "*://*.ibytedtos.com/*",
+        "https://dola.com/*",
+        "https://www.dola.com/*",
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.dola.com/*",
+                "*://*.seaart.ai/*",
+                "https://dola.com/*",
+                "https://www.dola.com/*"
+            ],
+            "js": [
+                "image-attachment-main.js",
+                "without watermark/extractor.js",
+                "inject.js"
+            ],
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
+        {
+            "matches": [
+                "*://*.dola.com/*",
+                "*://*.seaart.ai/*",
+                "https://dola.com/*",
+                "https://www.dola.com/*"
+            ],
+            "css": [
+                "dock-polish.css"
+            ],
+            "js": [
+                "content.js",
+                "raw-watermark-free-downloader.js",
+                "site-polish.js",
+                "verified-image-upload-content.js"
+            ],
+            "run_at": "document_start"
+        }
+    ],
+    "action": {
+        "default_title": "DragonBMT",
+        "default_icon": {
+            "16": "icon16.png",
+            "48": "icon48.png",
+            "128": "icon128.png"
+        }
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "inject.js",
+                "brand-icon.svg",
+                "icon16.png",
+                "icon48.png",
+                "icon128.png"
+            ],
+            "matches": [
+                "*://*.dola.com/*",
+                "*://*.seaart.ai/*",
+                "https://dola.com/*",
+                "https://www.dola.com/*"
+            ]
+        }
+    ],
+    "key": "MIIBCgKCAQEAyQ2+V56Vinsbto1UmXWjRokf49G4CPfkzVT2Gz0QtjG8/A0O+B5PnNv23Rj13yQdiCs1mxO8UzZjERxUbBNVuSW5qr1k8BLahtrv2LiW3TQIP5/MvtyXPboE+b+NfmEXz53Yf0TiaD/Bp0bcYYZL6RrgpXZJ9pIvaW/KkN9Jvug0Luda2qkHY+tmwwq+e4JUs6rcORHX9DN2ipBBeH0/xMQsjTjLYxsD+Mpj7ZvNI9xJygyhogCAQRRV/oJA8LaRbmc58PUK42SaGlhVsoPBmTB+DxuPRENL3MvTnKz2hPdCmg6Dk6O7wZrefbJ4QpZNSOWODhJ2S646zBLHBx9FiQIDAQAB"
+}
