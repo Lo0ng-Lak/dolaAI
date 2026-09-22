@@ -76,7 +76,6 @@ export function AppProvider({ children }) {
   const [videos, setVideos] = useState([]);
   const [logs, setLogs] = useState([
     nowLog("info", "Ứng dụng sẵn sàng."),
-    nowLog("info", "Theo dõi tiến trình ngay trong tool. Chrome chỉ chạy ẩn nền, không cần tự mở."),
   ]);
   const [proxies, setProxies] = useState([]);
   const [running, setRunning] = useState(false);
@@ -84,7 +83,17 @@ export function AppProvider({ children }) {
   const [openAccountIds, setOpenAccountIds] = useState([]);
 
   const addLog = (level, message) => {
-    setLogs((prev) => [nowLog(level, message), ...prev].slice(0, 200));
+    const text = String(message || "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const closed = /target closed|has been closed|browser has been closed|context or browser/i.test(text);
+    const next = closed
+      ? nowLog("info", "Đã tắt Chrome.")
+      : nowLog(level, text.replace(/[A-Za-z]:\\[^\s]+\\profiles\\[^\s]+/g, "profile nội bộ"));
+    setLogs((prev) => {
+      if (prev[0]?.message === next.message && prev[0]?.time === next.time) return prev;
+      if (next.message === "Đã tắt Chrome." && prev[0]?.message === "Đã tắt Chrome.") return prev;
+      return [next, ...prev].slice(0, 200);
+    });
   };
 
   useEffect(() => {

@@ -27,6 +27,7 @@ import {
   startVideoWatch,
 } from "./videos.js";
 import { VIDEO_DIR, VIDEO_OUT, VIDEO_RAW } from "./paths.js";
+import { isClosedNoise, sanitizeLog } from "./logText.js";
 
 const app = express();
 const bus = new EventEmitter();
@@ -35,9 +36,11 @@ bus.setMaxListeners(50);
 app.use(express.json({ limit: "80mb" }));
 
 function log(level, message) {
-  const entry = { time: new Date().toTimeString().slice(0, 8), level, message };
+  const clean = sanitizeLog(level, message);
+  if (!clean) return;
+  const entry = { time: new Date().toTimeString().slice(0, 8), ...clean };
   bus.emit("log", entry);
-  console.log(`[${entry.time}] [${level}] ${message}`);
+  console.log(`[${entry.time}] [${entry.level}] ${entry.message}`);
 }
 
 bindVideoEvents({
@@ -193,6 +196,10 @@ app.post("/api/accounts/:id/open", async (req, res) => {
     const result = await openAccountBrowser(req.params.id, log);
     res.json({ ok: true, ...result, accounts: await loadAccounts() });
   } catch (err) {
+    if (isClosedNoise(err.message)) {
+      log("info", "Đã tắt Chrome.");
+      return res.json({ ok: true, accounts: await loadAccounts() });
+    }
     log("error", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -203,6 +210,10 @@ app.post("/api/accounts/:id/check", async (req, res) => {
     const result = await checkAccountSession(req.params.id, log);
     res.json({ ok: true, ...result, accounts: await loadAccounts() });
   } catch (err) {
+    if (isClosedNoise(err.message)) {
+      log("info", "Đã tắt Chrome.");
+      return res.json({ ok: true, accounts: await loadAccounts() });
+    }
     log("error", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }

@@ -12,7 +12,7 @@ export default function StudioPage() {
             Về dashboard
           </button>
         </div>
-        <p className="mb-4 text-sm leading-6 text-slate-300">
+        <p className="mb-4 text-sm leading-6 text-ink-800">
           Studio dùng Chrome + DragonBMT chỉ để gửi lệnh. Gửi xong Chrome tắt. Tiến trình và
           video hoàn thiện ở danh sách tác vụ trong tool. Duration ép 30/60s.
         </p>

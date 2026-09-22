@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { loadAccounts, saveAccounts } from "./store.js";
-import { closeAccountSession, getAccountSession, markAccount, listOpenSessions, parkAccountSession } from "./sessions.js";
+import { closeAccountSession, getAccountSession, markAccount, listOpenSessions, parkAccountSession, sessionPurpose } from "./sessions.js";
 import { clampDailyLimit, normalizeAccountQuota } from "../shared/quota.js";
 import { buildPromptWithSpecs, continueAfterDurationRefusal, forcedDuration, stripSpecBlock } from "../shared/promptSpec.js";
 import { durationSeconds, forcedDurationLabel, getCachedStudioRelay, resolveStudioRelayPath } from "./extension.js";
@@ -61,20 +61,23 @@ export async function openAccountBrowser(accountId, log) {
   const { account, page } = await getAccountSession(accountId, log, { purpose: "login" });
   await startVideoWatch(log);
   await page.goto(DOLA_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await waitForStudioRelay(page, log);
-  await applyStudioRelaySettings(page, { duration: "30s", ratio: "16:9" }, log);
+  await page.waitForTimeout(800);
   const needLogin = await pageNeedsLogin(page);
   if (needLogin) {
+    await waitForStudioRelay(page, log);
+    await applyStudioRelaySettings(page, { duration: "30s", ratio: "16:9" }, log);
     await markAccount(accountId, { status: "need_login", sessionOk: false, lastCheck: new Date().toISOString() });
-    log("info", `${account.email}: mở phiên riêng. Đăng nhập Google một lần — cookie giữ trong profile, lần chạy sau vào đúng phiên này.`);
+    log("info", `${account.email}: chưa login — giữ Chrome để đăng nhập Google. Xong thì cookie giữ trong profile.`);
   } else {
     await markAccount(accountId, { status: "active", sessionOk: true, lastCheck: new Date().toISOString() });
-    log("info", `${account.email}: đã đăng nhập sẵn. Khi chạy task sẽ vào đúng phiên này.`);
+    log("info", `${account.email}: cookie đã đăng nhập — tắt Chrome.`);
+    await closeAccountSession(accountId);
   }
   return { accountId, needLogin };
 }
 
 export async function checkAccountSession(accountId, log) {
+  const keep = sessionPurpose(accountId) === "run" || sessionPurpose(accountId) === "watch";
   const { account, page } = await getAccountSession(accountId, log);
   await page.goto(DOLA_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
@@ -85,7 +88,12 @@ export async function checkAccountSession(accountId, log) {
     lastCheck: new Date().toISOString(),
   };
   await markAccount(accountId, patch);
-  log(needLogin ? "warn" : "info", `${account.email}: ${needLogin ? "chưa đăng nhập / hết phiên" : "cookie/phiên còn hiệu lực"}`);
+  if (!keep) {
+    await closeAccountSession(accountId);
+    log(needLogin ? "warn" : "info", `${account.email}: ${needLogin ? "chưa đăng nhập / hết phiên" : "phiên còn hiệu lực"} — đã tắt Chrome.`);
+  } else {
+    log(needLogin ? "warn" : "info", `${account.email}: ${needLogin ? "chưa đăng nhập / hết phiên" : "phiên còn hiệu lực"}.`);
+  }
   return patch;
 }
 
@@ -598,10 +606,12 @@ export async function importCookies(accountId, cookies, log) {
     sessionOk: !needLogin,
     lastCheck: new Date().toISOString(),
   });
-  log(
-    needLogin ? "warn" : "info",
-    `${account.email}: đã nạp ${normalized.length} cookie${needLogin ? " nhưng phiên vẫn chưa login" : " — phiên Active"}.`,
-  );
+  if (!needLogin) {
+    await closeAccountSession(accountId);
+    log("info", `${account.email}: đã nạp ${normalized.length} cookie — phiên Active, tắt Chrome.`);
+  } else {
+    log("warn", `${account.email}: đã nạp ${normalized.length} cookie nhưng vẫn chưa login — giữ Chrome.`);
+  }
   return { count: normalized.length, needLogin };
 }
 

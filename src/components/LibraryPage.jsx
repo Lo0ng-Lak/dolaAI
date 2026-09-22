@@ -18,7 +18,7 @@ export default function LibraryPage() {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Thư viện Video Studio</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-700">
             Chỉ bản đã Lanczos, không watermark, đúng chất lượng đã cài đặt.
           </p>
         </div>
@@ -42,7 +42,7 @@ export default function LibraryPage() {
       />
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {filtered.length === 0 && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-700">
             {ready.length ? "Không khớp từ khóa." : "Chưa có video thư viện. Clip đang xử lý vào đây sau khi Lanczos xong."}
           </p>
         )}
@@ -50,8 +50,8 @@ export default function LibraryPage() {
           <article key={video.id} className="panel p-3">
             <video className="mb-2 aspect-video w-full rounded-xl bg-black object-cover" src={video.url} controls preload="metadata" />
             <h3 className="truncate text-sm font-medium">{video.prompt || video.title}</h3>
-            <p className="text-xs text-mint">{video.qualityLabel}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs font-medium text-mintDim">{video.qualityLabel}</p>
+            <p className="text-xs text-ink-700">
               {video.account} · {video.duration}
               {video.height ? ` · ${video.height}p` : ""}
             </p>

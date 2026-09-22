@@ -17,9 +17,9 @@ function formatElapsed(createdAt) {
 }
 
 function statusTone(video) {
-  if (video.libraryReady || video.status === "upscaled") return "text-mint";
-  if (video.status === "failed" || video.status === "lanczos_failed") return "text-rose-300";
-  return "text-amber-300";
+  if (video.libraryReady || video.status === "upscaled") return "text-mintDim";
+  if (video.status === "failed" || video.status === "lanczos_failed") return "text-rose-600";
+  return "text-amber-700";
 }
 
 export default function VideoPanel() {
@@ -48,7 +48,7 @@ export default function VideoPanel() {
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="section-title">Tác vụ video live</h2>
-          <span className="rounded-full border border-white/10 bg-ink-800 px-2 py-0.5 text-[10px] text-slate-400">
+          <span className="rounded-full border border-line bg-slate-50 px-2 py-0.5 text-[10px] text-ink-700">
             {videos.length} tác vụ
           </span>
         </div>
@@ -89,7 +89,7 @@ export default function VideoPanel() {
 
       <div className="min-h-0 flex-1 space-y-2 overflow-auto">
         {videos.length === 0 && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-700">
             Chưa có tác vụ. Sau khi gửi, % và video hoàn thiện hiện ở đây — không cần mở Chrome.
           </p>
         )}
@@ -97,13 +97,13 @@ export default function VideoPanel() {
           const ready = Boolean(video.libraryReady && video.url);
           const progress = ready ? 100 : video.progress || 0;
           return (
-            <article key={video.id} className="rounded-2xl border border-white/5 bg-ink-900/90 p-3">
+            <article key={video.id} className="rounded-2xl border border-line bg-slate-50 p-3">
               <div className="flex gap-3">
-                <div className="relative h-[76px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-ink-800">
+                <div className="relative h-[76px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-slate-200">
                   {ready ? (
                     <video className="h-full w-full object-cover" src={video.url} muted preload="metadata" />
                   ) : (
-                    <div className="grid h-full w-full place-items-center text-slate-500">
+                    <div className="grid h-full w-full place-items-center text-ink-600">
                       <Eye size={18} />
                     </div>
                   )}
@@ -112,7 +112,7 @@ export default function VideoPanel() {
                   <div className="mb-1 flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-medium">{video.account || video.title}</h3>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-ink-700">
                         <span>{video.duration || "30s"}</span>
                         <span>{video.ratio || "16:9"}</span>
                         <span className={statusTone(video)}>
@@ -122,7 +122,7 @@ export default function VideoPanel() {
                     </div>
                     <button
                       type="button"
-                      className="text-slate-500 hover:text-rose-300"
+                      className="text-ink-600 hover:text-rose-600"
                       onClick={() => removeVideo(video.id)}
                       title="Xóa tác vụ"
                     >
@@ -130,24 +130,24 @@ export default function VideoPanel() {
                     </button>
                   </div>
                   {video.prompt && (
-                    <p className="mb-1 truncate text-[11px] text-slate-500">{video.prompt}</p>
+                    <p className="mb-1 truncate text-[11px] text-ink-700">{video.prompt}</p>
                   )}
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-ink-700">
                       {ready ? "✓ " : ""}
                       {video.statusLabel || "Đang tạo"} {progress}%
                       {video.progressSource === "dola" ? " · Dola" : ""}
                       {" · "}
                       {formatElapsed(video.createdAt)}
                     </p>
-                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-1 text-[10px] text-ink-700">
                       <span>Upscale:</span>
                       {UPSCALE.map((item) => (
                         <button
                           key={item.preset}
                           type="button"
                           disabled={!video.rawUrl && !ready}
-                          className="rounded-full border border-white/10 px-2 py-0.5 text-slate-300 hover:border-mint/40 hover:text-mint disabled:opacity-40"
+                          className="rounded-full border border-line bg-white px-2 py-0.5 text-ink-800 hover:border-mint hover:text-mint disabled:opacity-40"
                           onClick={() => upscaleStoredVideo(video.id, item.preset)}
                         >
                           {item.label}
@@ -156,11 +156,11 @@ export default function VideoPanel() {
                     </div>
                   </div>
                   {!ready && (
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-800">
-                      <div className="h-full rounded-full bg-gradient-to-r from-mint to-[#7dfff0] transition-all" style={{ width: `${progress}%` }} />
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${progress}%` }} />
                     </div>
                   )}
-                  {video.error && <p className="mt-1 text-[11px] text-rose-300">{video.error}</p>}
+                  {video.error && <p className="mt-1 text-[11px] text-rose-600">{video.error}</p>}
                 </div>
               </div>
             </article>

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -19,12 +19,12 @@ body,
 
 body {
   font-family: Inter, Segoe UI, system-ui, sans-serif;
-  color: #f4f7fb;
+  color: #0f172a;
   overflow: hidden;
   background:
-    radial-gradient(1100px 520px at 6% -8%, rgba(62, 240, 208, 0.16), transparent 52%),
-    radial-gradient(900px 480px at 100% 0%, rgba(155, 125, 255, 0.14), transparent 48%),
-    #1a2030;
+    radial-gradient(900px 420px at 0% -10%, rgba(13, 148, 136, 0.08), transparent 50%),
+    radial-gradient(720px 360px at 100% 0%, rgba(79, 70, 229, 0.06), transparent 48%),
+    #e8eef6;
 }
 
 ::-webkit-scrollbar {
@@ -33,7 +33,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #55637f;
+  background: #c5d0de;
   border-radius: 999px;
 }
 
@@ -47,35 +47,35 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .panel {
-  @apply rounded-2xl border border-white/10 bg-ink-850/95 shadow-panel backdrop-blur-sm;
+  @apply rounded-2xl border border-line bg-paper shadow-panel;
 }
 
 .soft-btn {
-  @apply inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-ink-800 px-3 py-1.5 text-xs font-medium text-slate-100 transition hover:border-white/30 hover:bg-ink-700;
+  @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-900 transition hover:border-mint/40 hover:bg-mintSoft hover:text-mintDim;
 }
 
 .mint-btn {
-  @apply inline-flex items-center gap-1.5 rounded-full bg-mint px-3.5 py-1.5 text-xs font-semibold text-ink-950 shadow-mint transition hover:bg-[#6ff7df] disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex items-center gap-1.5 rounded-full bg-mint px-3.5 py-1.5 text-xs font-semibold text-white shadow-mint transition hover:bg-mintDim disabled:cursor-not-allowed disabled:opacity-55;
 }
 
 .field {
-  @apply w-full rounded-xl border border-white/15 bg-ink-900 px-3 py-2 text-sm text-white outline-none transition focus:border-mint/60 focus:ring-2 focus:ring-mint/20;
+  @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink-950 outline-none transition placeholder:text-ink-600 focus:border-mint focus:ring-2 focus:ring-mint/20;
 }
 
 .chip {
-  @apply rounded-full border border-white/15 bg-ink-800 px-3 py-1.5 text-xs text-slate-100 transition hover:border-white/30;
+  @apply rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink-800 transition hover:border-mint/40 hover:text-mintDim;
 }
 
 .chip-on {
-  @apply border-mint/40 bg-mint font-semibold text-ink-950 shadow-mint;
+  @apply border-mint bg-mint font-semibold text-white shadow-mint;
 }
 
 .section-title {
-  @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300;
+  @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700;
 }
 
 .switch {
-  @apply relative h-5 w-9 shrink-0 rounded-full bg-ink-700 transition;
+  @apply relative h-5 w-9 shrink-0 rounded-full bg-slate-300 transition;
 }
 
 .switch[data-on="true"] {
@@ -84,7 +84,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .switch::after {
   content: "";
-  @apply absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition;
+  @apply absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition;
 }
 
 .switch[data-on="true"]::after {

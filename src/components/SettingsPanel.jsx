@@ -5,7 +5,7 @@ import { DURATIONS, LANCZOS_PRESETS, MODELS, RATIOS } from "../settingsOptions.j
 function Field({ icon: Icon, label, children }) {
   return (
     <div>
-      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-700">
         <Icon size={12} className="text-mint/70" />
         {label}
       </p>
@@ -40,7 +40,7 @@ export default function SettingsPanel() {
     <div className="panel p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="section-title">Thông số hệ thống</h2>
-        <span className={`rounded-full px-2.5 py-1 text-[10px] ${extension?.ready ? "bg-mint/10 text-mint" : "bg-amber-500/10 text-amber-300"}`}>
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${extension?.ready ? "bg-mintSoft text-mintDim" : "bg-amber-50 text-amber-700"}`}>
           {extension?.ready ? "DragonBMT sẵn sàng" : "Chưa thấy DragonBMT"}
           {" · "}
           {lanczosOn ? settings.resolution : "giữ gốc"}
@@ -87,17 +87,17 @@ export default function SettingsPanel() {
         </Field>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3 text-xs text-slate-400">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 text-xs text-ink-700">
         <p>
           Ép {settings.duration === "60s" ? "60s" : "30s"} qua DragonBMT. 1 email = 1 Chrome, tối đa {settings.dailyLimit || 2} video/ngày.
         </p>
-        <div className="flex flex-wrap items-center gap-2 text-slate-300">
+        <div className="flex flex-wrap items-center gap-2 text-ink-800">
           {[
             ["Hạn/ngày", "dailyLimit", settings.dailyLimit || 2, (v) => set("dailyLimit", Number(v) === 1 ? 1 : 2), "select"],
             ["Số video", "videoCount", settings.videoCount, (v) => set("videoCount", Number(v) || 1)],
             ["Chạy tối đa", "concurrency", settings.concurrency ?? 2, (v) => set("concurrency", Math.min(8, Math.max(1, Number(v) || 1)))],
           ].map(([label, key, value, onChange, kind]) => (
-            <label key={key} className="flex items-center gap-2 rounded-full border border-white/10 bg-ink-900 px-3 py-1">
+            <label key={key} className="flex items-center gap-2 rounded-full border border-line bg-slate-50 px-3 py-1">
               {label}
               {kind === "select" ? (
                 <select className="bg-transparent text-mint outline-none" value={value} onChange={(e) => onChange(e.target.value)}>

@@ -139,9 +139,9 @@ export async function getAccountSession(accountId, log, { forceNew = false, offs
   await fs.mkdir(dir, { recursive: true });
   await writeChromeDownloadPrefs(dir, VIDEO_RAW).catch(() => {});
   const extension = await resolveStudioRelayPath();
-  log?.("info", `${account.email}: 1 phiên riêng / 1 tab · proxy ${label} · profile ${dir}`);
+  log?.("info", `${account.email}: mở phiên · ${label}`);
   if (extension?.path) {
-    log?.("info", `${account.email}: nạp DragonBMT (${extension.source})`);
+    log?.("info", `${account.email}: DragonBMT sẵn sàng`);
   } else {
     log?.("warn", `${account.email}: không tìm thấy DragonBMT trong repo hoặc Chrome. Task sẽ chạy thiếu ép duration/download.`);
   }

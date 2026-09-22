@@ -13,12 +13,12 @@ import { useApp } from "../store.jsx";
 
 function statusBadge(account) {
   if (account.status === "active" && account.sessionOk) {
-    return <span className="text-xs text-emerald-300">Active</span>;
+    return <span className="text-xs font-medium text-emerald-700">Active</span>;
   }
   if (account.status === "need_login") {
-    return <span className="text-xs text-rose-300">Chưa đăng nhập</span>;
+    return <span className="text-xs font-medium text-rose-700">Chưa đăng nhập</span>;
   }
-  return <span className="text-xs text-amber-300">{account.status || "Chưa kiểm tra"}</span>;
+  return <span className="text-xs font-medium text-amber-700">{account.status || "Chưa kiểm tra"}</span>;
 }
 
 export default function AccountsPage({ embedded = false }) {
@@ -74,12 +74,12 @@ export default function AccountsPage({ embedded = false }) {
   return (
     <div className={`flex flex-col overflow-hidden ${embedded ? "h-[70vh]" : "panel h-full"}`}>
       {!embedded && (
-      <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-900">
             Quản lý tài khoản Google ({accounts.length} tài khoản)
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-700">
             Đăng nhập một lần, giữ phiên. Khi chạy, tool mở đúng Chrome đã login rồi gửi task.
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function AccountsPage({ embedded = false }) {
       </div>
       )}
       {embedded && (
-        <div className="flex justify-end gap-2 border-b border-white/5 px-5 py-2">
+        <div className="flex justify-end gap-2 border-b border-line px-5 py-2">
           <button type="button" className="soft-btn" onClick={refreshData}>
             <RefreshCw size={13} />
             Làm mới
@@ -105,10 +105,10 @@ export default function AccountsPage({ embedded = false }) {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[42%] flex-col border-r border-white/5 p-4">
+        <aside className="flex w-[42%] flex-col border-r border-line p-4">
           <div className="mb-3 flex flex-wrap gap-2">
             <div className="relative min-w-[160px] flex-1">
-              <Search size={13} className="absolute left-2.5 top-2.5 text-slate-500" />
+              <Search size={13} className="absolute left-2.5 top-2.5 text-ink-700" />
               <input
                 className="field pl-8"
                 placeholder="Tìm email"
@@ -141,8 +141,8 @@ export default function AccountsPage({ embedded = false }) {
           </div>
 
           {importOpen && (
-            <div className="mb-3 rounded-lg border border-white/10 bg-ink-900 p-3">
-              <p className="mb-2 text-xs text-slate-400">Mỗi dòng một email.</p>
+            <div className="mb-3 rounded-lg border border-line bg-slate-50 p-3">
+              <p className="mb-2 text-xs text-ink-700">Mỗi dòng một email.</p>
               <textarea
                 className="field min-h-24 font-mono text-xs"
                 value={importText}
@@ -169,7 +169,7 @@ export default function AccountsPage({ embedded = false }) {
 
           <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
             {filtered.length === 0 && (
-              <p className="text-sm text-slate-500">Chưa có tài khoản. Thêm email Google của bạn.</p>
+              <p className="text-sm text-ink-700">Chưa có tài khoản. Thêm email Google của bạn.</p>
             )}
             {filtered.map((acc) => {
               const active = selected?.id === acc.id;
@@ -179,7 +179,7 @@ export default function AccountsPage({ embedded = false }) {
                   type="button"
                   onClick={() => setInspectId(acc.id)}
                   className={`w-full rounded-xl border px-3 py-3 text-left ${
-                    active ? "border-mint/30 bg-ink-800" : "border-white/5 bg-ink-900"
+                    active ? "border-mint bg-mintSoft" : "border-line bg-slate-50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -194,7 +194,7 @@ export default function AccountsPage({ embedded = false }) {
                         <span className="block truncate text-sm">{acc.email}</span>
                         <span className="flex items-center gap-2">
                           {statusBadge(acc)}
-                          <span className={`text-[11px] ${acc.quotaFull ? "text-amber-300" : "text-slate-500"}`}>
+                          <span className={`text-[11px] ${acc.quotaFull ? "text-amber-700" : "text-ink-700"}`}>
                             {acc.sentToday || 0}/{acc.dailyLimit || 2} video hôm nay
                           </span>
                         </span>
@@ -238,29 +238,28 @@ export default function AccountsPage({ embedded = false }) {
 
         <section className="min-w-0 flex-1 overflow-auto p-5">
           {!selected ? (
-            <p className="text-sm text-slate-500">Chọn một tài khoản bên trái.</p>
+            <p className="text-sm text-ink-700">Chọn một tài khoản bên trái.</p>
           ) : (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Tài khoản đang chọn</p>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-ink-700">Tài khoản đang chọn</p>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <h3 className="truncate text-lg font-medium">{selected.email}</h3>
                   {statusBadge(selected)}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/5 bg-ink-900 p-4">
+              <div className="rounded-xl border border-line bg-slate-50 p-4">
                 <p className="text-sm font-medium">Đăng nhập trực tiếp Google</p>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Bấm <span className="text-slate-200">Mở trình duyệt</span> — cửa sổ Chrome của đúng email này.
-                  Đăng nhập Google một lần. Phiên được giữ trong profile. Lúc chạy task, tool vào đúng cửa sổ
-                  đã login rồi gửi, không bắt đăng nhập lại.
+                <p className="mt-2 text-xs leading-5 text-ink-700">
+                  Bấm <span className="font-medium text-ink-950">Mở trình duyệt</span> nếu chưa login.
+                  Đã có cookie thì Chrome tự tắt. Kiểm tra phiên xong cũng tự tắt.
                 </p>
               </div>
 
-              <div className="rounded-xl border border-white/5 bg-ink-900 p-4">
+              <div className="rounded-xl border border-line bg-slate-50 p-4">
                 <p className="text-sm font-medium">Hạn mức video trong ngày</p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-700">
                   Tối đa 1 hoặc 2 video / tài khoản / ngày. Hết hạn thì dừng tài khoản đó. Qua ngày tự reset, gửi tiếp được.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -272,18 +271,18 @@ export default function AccountsPage({ embedded = false }) {
                     <option value={1}>1 video / ngày</option>
                     <option value={2}>2 video / ngày</option>
                   </select>
-                  <div className="flex items-center rounded-lg border border-white/10 px-3 text-xs text-slate-300">
+                  <div className="flex items-center rounded-lg border border-line bg-white px-3 text-xs text-ink-800">
                     Hôm nay {selected.sentToday || 0}/{selected.dailyLimit || 2}
                     {selected.quotaFull ? " · hết hạn, chờ ngày mai" : ` · còn ${selected.remaining ?? (selected.dailyLimit || 2) - (selected.sentToday || 0)}`}
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/5 bg-ink-900 p-4">
+              <div className="rounded-xl border border-line bg-slate-50 p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">Cấu hình Proxy lên kết</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-ink-700">
                       Mặc định dùng IP gốc. Chọn proxy cố định/xoay nếu muốn đổi IP. Cookie đăng nhập vẫn giữ trong profile.
                     </p>
                   </div>
@@ -324,21 +323,21 @@ export default function AccountsPage({ embedded = false }) {
                 </button>
               </div>
 
-              <div className="rounded-xl border border-white/5 bg-ink-900 p-4 text-xs text-slate-400">
-                <p className="mb-2 font-medium text-slate-200">Trạng thái cookie / session</p>
+              <div className="rounded-xl border border-line bg-slate-50 p-4 text-xs text-ink-700">
+                <p className="mb-2 font-medium text-ink-900">Trạng thái cookie / session</p>
                 <p>
                   {selected.sessionOk
                     ? `Đã lưu phiên Active — chạy task sẽ vào đúng ${selected.email}.`
-                    : "Chưa login. Mở trình duyệt, đăng nhập Google, rồi bấm Kiểm tra phiên."}
+                    : "Chưa login. Mở trình duyệt, đăng nhập Google. Đã login thì Chrome tự tắt."}
                 </p>
                 {selected.lastCheck && (
-                  <p className="mt-1 text-slate-500">Kiểm tra lần cuối: {new Date(selected.lastCheck).toLocaleString()}</p>
+                  <p className="mt-1 text-ink-700">Kiểm tra lần cuối: {new Date(selected.lastCheck).toLocaleString()}</p>
                 )}
               </div>
 
               {cookieOpen && (
-                <div className="rounded-xl border border-white/10 bg-ink-900 p-4">
-                  <p className="mb-2 text-xs text-slate-400">
+                <div className="rounded-xl border border-line bg-slate-50 p-4">
+                  <p className="mb-2 text-xs text-ink-700">
                     Dán JSON cookie do bạn xuất từ chính tài khoản này (mảng name/value/domain).
                   </p>
                   <textarea
@@ -358,7 +357,7 @@ export default function AccountsPage({ embedded = false }) {
               )}
 
               <div>
-                <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-ink-700">
                   Danh sách tài khoản ({accounts.length})
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -367,7 +366,7 @@ export default function AccountsPage({ embedded = false }) {
                       key={acc.id}
                       type="button"
                       onClick={() => setInspectId(acc.id)}
-                      className="flex items-center justify-between rounded-lg border border-white/5 bg-ink-900 px-3 py-2 text-left"
+                      className="flex items-center justify-between rounded-lg border border-line bg-slate-50 px-3 py-2 text-left"
                     >
                       <span className="truncate text-xs">{acc.email}</span>
                       {statusBadge(acc)}

@@ -13,7 +13,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <Header />
-      <main className="min-h-0 flex-1 overflow-hidden p-3">
+      <main className="min-h-0 flex-1 overflow-hidden p-4">
         {page === "library" ? <LibraryPage /> : <Dashboard />}
       </main>
       {overlay === "accounts" && (

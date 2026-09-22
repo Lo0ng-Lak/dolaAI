@@ -2,9 +2,9 @@ import { RefreshCw, Search } from "lucide-react";
 import { useApp } from "../store.jsx";
 
 function label(account) {
-  if (account.status === "active" && account.sessionOk) return { text: "Active", cls: "bg-emerald-500/15 text-emerald-300" };
-  if (account.status === "need_login") return { text: "Chưa login", cls: "bg-rose-500/15 text-rose-300" };
-  return { text: account.status || "Chưa kiểm tra", cls: "bg-white/10 text-slate-300" };
+  if (account.status === "active" && account.sessionOk) return { text: "Active", cls: "bg-emerald-50 text-emerald-700" };
+  if (account.status === "need_login") return { text: "Chưa login", cls: "bg-rose-50 text-rose-700" };
+  return { text: account.status || "Chưa kiểm tra", cls: "bg-slate-100 text-slate-600" };
 }
 
 export default function AccountSelect() {
@@ -37,7 +37,7 @@ export default function AccountSelect() {
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-ink-800">
         <button
           type="button"
           className="flex items-center gap-2"
@@ -61,7 +61,7 @@ export default function AccountSelect() {
 
       <div className="space-y-2">
         {accounts.length === 0 && (
-          <p className="text-sm text-slate-500">Chưa có tài khoản. Vào Quản lý phiên để thêm Google account.</p>
+          <p className="text-sm text-ink-700">Chưa có tài khoản. Vào Quản lý phiên để thêm Google account.</p>
         )}
         {accounts.map((acc) => {
           const checked = selectedAccountIds.includes(acc.id);
@@ -70,7 +70,7 @@ export default function AccountSelect() {
             <label
               key={acc.id}
               className={`flex cursor-pointer items-center justify-between rounded-2xl border px-3 py-2.5 transition ${
-                checked ? "border-mint/25 bg-mint/[0.06]" : "border-white/5 bg-ink-900/80 hover:border-white/10"
+                checked ? "border-mint/40 bg-mintSoft" : "border-line bg-slate-50 hover:border-mint/30"
               }`}
             >
               <span className="flex min-w-0 items-center gap-3">
@@ -83,11 +83,11 @@ export default function AccountSelect() {
                 </span>
                 <span className="truncate text-sm">{acc.email}</span>
               </span>
-              <span className="flex items-center gap-2 text-xs text-slate-400">
+              <span className="flex items-center gap-2 text-xs text-ink-700">
                 <span className="hidden sm:inline">
                   {acc.proxyMode === "rotate" ? "Proxy xoay" : acc.proxyMode === "fixed" ? "Proxy cố định" : "Direct"}
                 </span>
-                <span className={acc.quotaFull ? "text-amber-300" : "text-slate-400"}>
+                <span className={acc.quotaFull ? "text-amber-700" : "text-ink-700"}>
                   {acc.sentToday || 0}/{acc.dailyLimit || 2}
                 </span>
                 <span className={`rounded-full px-2 py-0.5 ${badge.cls}`}>{badge.text}</span>
