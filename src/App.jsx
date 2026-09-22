@@ -19,7 +19,7 @@ export default function App() {
       {overlay === "accounts" && (
         <Modal
           title="Quản lý tài khoản Google"
-          subtitle="Mỗi email một phiên / một tab. Tối đa 1–2 video/ngày."
+          subtitle="Mỗi email một phiên / một tab. Tối đa 3 video/ngày."
           wide
           onClose={() => setOverlay(null)}
         >
@@ -29,7 +29,7 @@ export default function App() {
       {overlay === "proxy" && (
         <Modal
           title="Trung tâm quản lý Proxy"
-          subtitle="Gắn proxy cố định hoặc xoay cho từng tài khoản."
+          subtitle="Dán nhiều dòng một lượt. Gắn cố định hoặc xoay cho từng tài khoản."
           wide
           onClose={() => setOverlay(null)}
         >

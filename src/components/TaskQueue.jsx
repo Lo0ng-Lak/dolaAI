@@ -47,8 +47,8 @@ export default function TaskQueue() {
       </div>
 
       {batchOpen && (
-        <div className="mb-3 rounded-xl border border-line bg-slate-50 p-3">
-          <p className="mb-2 text-xs text-ink-700">Mỗi dòng là một prompt / một task.</p>
+        <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-800 p-3">
+          <p className="mb-2 text-xs text-zinc-400">Mỗi dòng là một prompt / một task.</p>
           <textarea
             className="field min-h-24 font-mono text-xs"
             value={batchText}
@@ -89,7 +89,7 @@ export default function TaskQueue() {
 
       {active ? (
         <>
-          <label className="mb-2 text-xs text-ink-700">
+          <label className="mb-2 text-xs text-zinc-400">
             Câu mô tả (Prompt của {active.title})
             <textarea
               className="field mt-1 min-h-[180px] font-mono text-[13px] leading-6"
@@ -100,7 +100,7 @@ export default function TaskQueue() {
 
           <div className="mt-2">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
                 Mục tham chiếu của task
               </h3>
               <div className="flex gap-2">
@@ -126,12 +126,12 @@ export default function TaskQueue() {
             />
             <div className="flex flex-wrap gap-2">
               {active.refs.length === 0 && (
-                <p className="text-xs text-ink-700">Chưa có ảnh tham chiếu.</p>
+                <p className="text-xs text-zinc-400">Chưa có ảnh tham chiếu.</p>
               )}
               {active.refs.map((ref) => (
                 <div
                   key={ref.id}
-                  className="grid h-16 w-16 place-items-center overflow-hidden rounded-lg border border-line bg-slate-50 text-[10px] text-ink-700"
+                  className="grid h-16 w-16 place-items-center overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 text-[10px] text-zinc-400"
                 >
                   {ref.url ? (
                     <img src={ref.url} alt={ref.name} className="h-full w-full object-cover" />
@@ -144,7 +144,7 @@ export default function TaskQueue() {
           </div>
         </>
       ) : (
-        <p className="text-sm text-ink-700">Chưa có task. Bấm Thêm Task để bắt đầu.</p>
+        <p className="text-sm text-zinc-400">Chưa có task. Bấm Thêm Task để bắt đầu.</p>
       )}
     </div>
   );

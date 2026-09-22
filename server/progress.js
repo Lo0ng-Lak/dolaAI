@@ -58,11 +58,26 @@ export async function readDolaTaskState(page, { promptHint = "" } = {}) {
         if (matches.length) percent = matches[matches.length - 1];
       }
 
-      const failed = /failed|error|thất bại|unable to generate|generation failed|something went wrong/i.test(text);
+      const hasPlayer = [...node.querySelectorAll("video")].some((el) => {
+        const src = el.currentSrc || el.src || el.querySelector("source")?.src || "";
+        return Boolean(src) && el.readyState >= 1;
+      });
+      const hasDownload = [...node.querySelectorAll("button, a, [role='button']")].some((el) =>
+        /^(fetch\s*(&|and)\s*download|download(\s+video)?|tải(\s+xuống|\s+video)?)$/i.test(
+          `${el.innerText || ""} ${el.getAttribute("aria-label") || ""}`.replace(/\s+/g, " ").trim(),
+        ),
+      );
+      const hintMatched = Boolean(hintNorm) && text.toLowerCase().includes(hintNorm.slice(0, 24));
+      const failed = /unable to generate|generation failed|something went wrong|thất bại|failed to (create|generate)/i.test(text);
       const queued = /queued|in queue|đang chờ|waiting in/i.test(text);
-      const generating = /generat|đang tạo|creating|rendering|processing video|in progress/i.test(text);
-      const downloadReady = /download|fetch|tải|completed|hoàn thành|ready/i.test(text) && !/downloaded!?|fetch\s*&\s*download\s*done/i.test(text);
-      const done = /downloaded!?|fetch\s*&\s*download\s*done|video ready|hoàn thành/i.test(text);
+      const generating = /đang tạo|creating video|rendering|processing video|in progress/i.test(text);
+      const thisTask = hintMatched || !hintNorm;
+      const isBody = node === body;
+      const downloadReady =
+        thisTask &&
+        !isBody &&
+        (hasPlayer || hasDownload || ((percent != null && percent >= 100) && /download|tải/i.test(text)));
+      const done = thisTask && !isBody && (hasPlayer || hasDownload || /downloaded!?|fetch\s*&\s*download\s*done|video ready/i.test(text));
 
       let stage = "unknown";
       if (failed) stage = "failed";
@@ -72,7 +87,8 @@ export async function readDolaTaskState(page, { promptHint = "" } = {}) {
       else if (downloadReady) stage = "ready";
 
       let score = 0;
-      if (hintNorm && text.toLowerCase().includes(hintNorm.slice(0, 24))) score += 5;
+      if (hintMatched) score += 8;
+      if (!thisTask && (done || downloadReady)) score -= 6;
       if (stage === "generating") score += 3;
       if (stage === "ready") score += 2;
       if (stage === "queued") score += 1;
@@ -87,9 +103,9 @@ export async function readDolaTaskState(page, { promptHint = "" } = {}) {
 
     const pageText = (body.innerText || "").slice(0, 20000);
     if (best.stage === "unknown") {
-      if (/failed|generation failed|thất bại/i.test(pageText)) best.stage = "failed";
+      if (/generation failed|unable to generate|thất bại|failed to (create|generate)/i.test(pageText)) best.stage = "failed";
       else if (/queued|in queue/i.test(pageText)) best.stage = "queued";
-      else if (/generat|đang tạo/i.test(pageText)) best.stage = "generating";
+      else if (/đang tạo video|generating video|creating video now/i.test(pageText)) best.stage = "generating";
     }
     if (best.percent == null) {
       const percents = [...pageText.matchAll(/(\d{1,3})\s*%/g)]

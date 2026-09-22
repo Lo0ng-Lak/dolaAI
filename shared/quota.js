@@ -1,4 +1,8 @@
-export const DEFAULT_DAILY_LIMIT = 2;
+export const DEFAULT_DAILY_LIMIT = 3;
+
+export function accountLoggedIn(account) {
+  return Boolean(account && account.status === "active" && account.sessionOk);
+}
 
 export function todayKey(date = new Date()) {
   const year = date.getFullYear();
@@ -9,8 +13,9 @@ export function todayKey(date = new Date()) {
 
 export function clampDailyLimit(value, fallback = DEFAULT_DAILY_LIMIT) {
   const number = Number(value);
-  if (number === 1 || number === 2) return number;
-  return fallback === 1 ? 1 : 2;
+  if (number === 1 || number === 2 || number === 3) return number;
+  const fb = Number(fallback);
+  return fb === 1 || fb === 2 || fb === 3 ? fb : 3;
 }
 
 export function normalizeAccountQuota(account = {}, defaultLimit = DEFAULT_DAILY_LIMIT) {

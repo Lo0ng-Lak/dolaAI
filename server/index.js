@@ -5,7 +5,7 @@ import os from "node:os";
 import { EventEmitter } from "node:events";
 import { upscaleVideo, upscaleLabel } from "./upscale.js";
 import { loadAccounts, saveAccounts, loadProxies, saveProxies, makeAccount } from "./store.js";
-import { closeAccountSession, markAccount, removeAccountProfile } from "./sessions.js";
+import { closeAccountSession, markAccount, maskProxyLabel, parseProxy, profileDir, removeAccountProfile } from "./sessions.js";
 import {
   openAccountBrowser,
   checkAccountSession,
@@ -14,7 +14,7 @@ import {
   importCookies,
   cancelRun,
 } from "./dola.js";
-import { resolveStudioRelayPath } from "./extension.js";
+import { installDragonBmtEverywhere, installExtensionIntoProfile, resolveStudioRelayPath } from "./extension.js";
 import { cancelAllCollects, cancelCollect } from "./collect.js";
 import {
   bindVideoEvents,
@@ -34,6 +34,14 @@ const bus = new EventEmitter();
 bus.setMaxListeners(50);
 
 app.use(express.json({ limit: "80mb" }));
+
+async function provisionAccountExtension(accountId) {
+  const extension = await resolveStudioRelayPath();
+  if (!extension?.path) return null;
+  const dir = profileDir(accountId);
+  await fs.mkdir(dir, { recursive: true });
+  return installExtensionIntoProfile(dir, extension);
+}
 
 function log(level, message) {
   const clean = sanitizeLog(level, message);
@@ -70,7 +78,10 @@ app.get("/api/events", (req, res) => {
   const onVideo = (video) => send({ type: "video", video });
   bus.on("log", onLog);
   bus.on("video", onVideo);
+  send({ type: "log", level: "info", time: new Date().toTimeString().slice(0, 8), message: "Nhật ký realtime đã kết nối." });
+  const keep = setInterval(() => res.write(": ping\n\n"), 15000);
   req.on("close", () => {
+    clearInterval(keep);
     bus.off("log", onLog);
     bus.off("video", onVideo);
   });
@@ -147,7 +158,8 @@ app.post("/api/accounts", async (req, res) => {
   const account = makeAccount(email, req.body, accounts.length);
   accounts.push(account);
   await saveAccounts(accounts);
-  log("info", `Đã thêm tài khoản ${email}.`);
+  await provisionAccountExtension(account.id);
+  log("info", `Đã thêm tài khoản ${email} · DragonBMT đã gắn vào profile Chrome.`);
   res.json(account);
 });
 
@@ -166,7 +178,8 @@ app.post("/api/accounts/import", async (req, res) => {
     added.push(account);
   }
   await saveAccounts(accounts);
-  log("info", `Import ${added.length} tài khoản.`);
+  for (const account of added) await provisionAccountExtension(account.id);
+  log("info", `Import ${added.length} tài khoản · DragonBMT đã gắn sẵn.`);
   res.json({ added, accounts });
 });
 
@@ -233,15 +246,70 @@ app.get("/api/proxies", async (_req, res) => {
   res.json(await loadProxies());
 });
 
+function splitProxyLines(raw) {
+  return String(raw || "")
+    .split(/[\r\n,;]+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function proxyKey(host, parsed) {
+  if (parsed?.server) return `${parsed.server}|${parsed.username || ""}`.toLowerCase();
+  return String(host || "").trim().toLowerCase();
+}
+
 app.post("/api/proxies", async (req, res) => {
-  const host = String(req.body?.host || "").trim();
-  if (!host) return res.status(400).json({ error: "Thiếu proxy." });
+  const lines = [
+    ...splitProxyLines(req.body?.host),
+    ...splitProxyLines((req.body?.hosts || []).join("\n")),
+  ];
+  const unique = [...new Set(lines)];
+  if (!unique.length) return res.status(400).json({ error: "Thiếu proxy. Dán nhiều dòng host:port:user:pass." });
+
   const proxies = await loadProxies();
-  const item = { id: crypto.randomUUID(), host, status: "idle" };
-  proxies.push(item);
-  await saveProxies(proxies);
-  log("info", `Đã thêm proxy ${host}.`);
-  res.json(item);
+  const seen = new Set(proxies.map((item) => {
+    try {
+      return proxyKey(item.host, parseProxy(item.host));
+    } catch {
+      return String(item.host || "").toLowerCase();
+    }
+  }));
+
+  const added = [];
+  const skipped = [];
+  const invalid = [];
+  for (const host of unique) {
+    let parsed;
+    try {
+      parsed = parseProxy(host);
+    } catch (err) {
+      invalid.push({ host, error: err.message });
+      continue;
+    }
+    if (!parsed) {
+      invalid.push({ host, error: "Thiếu proxy." });
+      continue;
+    }
+    const key = proxyKey(host, parsed);
+    if (seen.has(key)) {
+      skipped.push(host);
+      continue;
+    }
+    seen.add(key);
+    const item = { id: crypto.randomUUID(), host, status: "idle" };
+    proxies.push(item);
+    added.push(item);
+  }
+
+  if (added.length) await saveProxies(proxies);
+  if (added.length) {
+    log("info", `Đã thêm ${added.length} proxy một lượt${skipped.length ? ` · trùng ${skipped.length}` : ""}${invalid.length ? ` · sai ${invalid.length}` : ""}.`);
+  } else if (invalid.length && !skipped.length) {
+    return res.status(400).json({ error: invalid[0].error, added, skipped, invalid, proxies });
+  } else {
+    log("info", `Không thêm proxy mới${skipped.length ? ` · ${skipped.length} dòng trùng` : ""}${invalid.length ? ` · ${invalid.length} dòng sai` : ""}.`);
+  }
+  res.json({ added, skipped, invalid, proxies });
 });
 
 app.delete("/api/proxies/:id", async (req, res) => {
@@ -323,9 +391,12 @@ export function startServer({ port = Number(process.env.DOLA_PORT || 5176), stat
       const url = `http://127.0.0.1:${port}`;
       const extension = await resolveStudioRelayPath();
       if (extension?.path) {
-        log("info", `DragonBMT sẵn sàng (${extension.source}).`);
+        const accounts = await loadAccounts();
+        for (const account of accounts) await provisionAccountExtension(account.id);
+        const installed = await installDragonBmtEverywhere();
+        log("info", `DragonBMT đã gắn sẵn vào mọi cấu hình Chrome (${installed.profiles} profile).`);
       } else {
-        log("warn", "Chưa thấy DragonBMT. Cài extension Chrome hoặc giữ thư mục studiorelay/.");
+        log("warn", "Thiếu gói DragonBMT trong app. Giữ thư mục studiorelay/ rồi mở lại.");
       }
       await loadVideos();
       await startVideoWatch(log);

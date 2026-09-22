@@ -9,6 +9,7 @@ import { PRESET_HEIGHT, upscaleLabel, upscaleVideo } from "./upscale.js";
 let runContext = {
   accountEmail: "",
   duration: "30s",
+  ratio: "16:9",
   resolution: "2160p",
   lanczos: true,
 };
@@ -241,27 +242,39 @@ export async function ensureVideoDirs() {
   await fsp.mkdir(VIDEO_OUT, { recursive: true });
 }
 
-export async function writeChromeDownloadPrefs(profileDir, downloadDir) {
-  await fsp.mkdir(downloadDir, { recursive: true });
-  const prefsFile = path.join(profileDir, "Preferences");
+async function writePrefsFile(file, mutator) {
   let prefs = {};
   try {
-    prefs = JSON.parse(await fsp.readFile(prefsFile, "utf8"));
+    prefs = JSON.parse(await fsp.readFile(file, "utf8"));
   } catch {
     prefs = {};
   }
+  mutator(prefs);
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await fsp.writeFile(file, JSON.stringify(prefs));
+}
+
+export async function writeChromeDownloadPrefs(profileDir, downloadDir) {
+  await fsp.mkdir(downloadDir, { recursive: true });
   const normalized = downloadDir.replace(/\//g, path.sep);
-  prefs.download = {
-    ...(prefs.download || {}),
-    default_directory: normalized,
-    prompt_for_download: false,
-    directory_upgrade: true,
+  const apply = (prefs) => {
+    prefs.download = {
+      ...(prefs.download || {}),
+      default_directory: normalized,
+      prompt_for_download: false,
+      directory_upgrade: true,
+    };
+    prefs.savefile = {
+      ...(prefs.savefile || {}),
+      default_directory: normalized,
+    };
+    prefs.session = {
+      ...(prefs.session || {}),
+      restore_on_startup: 5,
+    };
   };
-  prefs.savefile = {
-    ...(prefs.savefile || {}),
-    default_directory: normalized,
-  };
-  await fsp.writeFile(prefsFile, JSON.stringify(prefs));
+  await writePrefsFile(path.join(profileDir, "Preferences"), apply);
+  await writePrefsFile(path.join(profileDir, "Default", "Preferences"), apply);
 }
 
 export async function attachSessionDownloads(context, { account, log } = {}) {
@@ -431,7 +444,7 @@ export async function ingestVideoFile(filePath, { accountEmail, accountId, log }
       account: email || "DragonBMT",
       accountId: id,
       duration: runContext.duration || "30s",
-      ratio: "16:9",
+      ratio: runContext.ratio || "16:9",
       prompt: "",
       resolution,
       lanczos: doLanczos,

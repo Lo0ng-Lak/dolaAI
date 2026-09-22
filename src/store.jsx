@@ -53,7 +53,7 @@ export function AppProvider({ children }) {
       resolution: "2160p",
       lanczos: true,
       rotateAccounts: true,
-      dailyLimit: 2,
+      dailyLimit: 3,
       hideChrome: true,
       startDelay: 0,
       nextDelay: 3,
@@ -90,9 +90,10 @@ export function AppProvider({ children }) {
       ? nowLog("info", "Đã tắt Chrome.")
       : nowLog(level, text.replace(/[A-Za-z]:\\[^\s]+\\profiles\\[^\s]+/g, "profile nội bộ"));
     setLogs((prev) => {
-      if (prev[0]?.message === next.message && prev[0]?.time === next.time) return prev;
-      if (next.message === "Đã tắt Chrome." && prev[0]?.message === "Đã tắt Chrome.") return prev;
-      return [next, ...prev].slice(0, 200);
+      const last = prev[prev.length - 1];
+      if (last?.message === next.message && last?.time === next.time) return prev;
+      if (next.message === "Đã tắt Chrome." && last?.message === "Đã tắt Chrome.") return prev;
+      return [...prev, next].slice(-400);
     });
   };
 
@@ -112,8 +113,9 @@ export function AppProvider({ children }) {
     const normalized = next.map((account) => normalizeAccountQuota(account, settings.dailyLimit));
     setAccounts(normalized);
     setSelectedAccountIds((prev) => {
-      const keep = prev.filter((id) => next.some((a) => a.id === id));
-      return keep.length ? keep : next.filter((a) => a.status === "active").map((a) => a.id);
+      const loggedIn = normalized.filter((account) => account.status === "active" && account.sessionOk).map((a) => a.id);
+      const keep = prev.filter((id) => loggedIn.includes(id));
+      return keep.length ? keep : loggedIn;
     });
     setInspectId((prev) => (next.some((a) => a.id === prev) ? prev : next[0]?.id || null));
   };
@@ -159,13 +161,22 @@ export function AppProvider({ children }) {
   }, []);
 
   const toggleAccount = (id) => {
+    const account = accounts.find((item) => item.id === id);
+    if (!account || account.status !== "active" || !account.sessionOk) {
+      addLog("warn", `${account?.email || "Tài khoản"} chưa login — mở trình duyệt đăng nhập rồi mới chọn để chạy.`);
+      return;
+    }
     setSelectedAccountIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
   const selectAllAccounts = (on) => {
-    setSelectedAccountIds(on ? accounts.map((a) => a.id) : []);
+    setSelectedAccountIds(
+      on
+        ? accounts.filter((account) => account.status === "active" && account.sessionOk).map((a) => a.id)
+        : [],
+    );
   };
 
   const addTask = () => {
@@ -286,6 +297,14 @@ export function AppProvider({ children }) {
     if (!res.ok) addLog("error", data.error || "Không kiểm tra được phiên.");
   };
 
+  const checkAllAccounts = async () => {
+    addLog("info", "Đang kiểm tra phiên từng tài khoản...");
+    for (const account of accounts) {
+      await checkAccount(account.id);
+    }
+    addLog("info", "Xong kiểm tra. Chỉ tài khoản xanh (đã login) mới chạy được.");
+  };
+
   const importAccountCookies = async (id, cookies) => {
     const res = await fetch(`/api/accounts/${id}/cookies`, {
       method: "POST",
@@ -303,7 +322,19 @@ export function AppProvider({ children }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ host }),
     });
-    if (res.ok) await refreshData();
+    const data = await readJson(res);
+    if (res.ok) {
+      if (data.proxies) setProxies(data.proxies);
+      else await refreshData();
+      const added = data.added?.length ?? (data.id ? 1 : 0);
+      const skipped = data.skipped?.length || 0;
+      const invalid = data.invalid?.length || 0;
+      if (added) addLog("info", `Đã thêm ${added} proxy.`);
+      if (skipped) addLog("info", `Bỏ ${skipped} proxy trùng.`);
+      if (invalid) addLog("warn", `Bỏ ${invalid} dòng sai định dạng.`);
+      if (!added && !skipped && !invalid) addLog("error", data.error || "Không thêm được proxy.");
+    } else addLog("error", data.error || "Không thêm được proxy.");
+    return data;
   };
 
   const removeProxy = async (id) => {
@@ -495,6 +526,7 @@ export function AppProvider({ children }) {
       removeAccount,
       openAccount,
       checkAccount,
+      checkAllAccounts,
       importAccountCookies,
       refreshData,
       tasks,

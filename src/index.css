@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * {
@@ -19,12 +19,12 @@ body,
 
 body {
   font-family: Inter, Segoe UI, system-ui, sans-serif;
-  color: #0f172a;
+  color: #f4f4f5;
   overflow: hidden;
   background:
-    radial-gradient(900px 420px at 0% -10%, rgba(13, 148, 136, 0.08), transparent 50%),
-    radial-gradient(720px 360px at 100% 0%, rgba(79, 70, 229, 0.06), transparent 48%),
-    #e8eef6;
+    radial-gradient(900px 420px at 8% -12%, rgba(45, 212, 191, 0.10), transparent 52%),
+    radial-gradient(720px 360px at 100% 0%, rgba(167, 139, 250, 0.08), transparent 48%),
+    #09090b;
 }
 
 ::-webkit-scrollbar {
@@ -33,7 +33,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c5d0de;
+  background: #3f3f46;
   border-radius: 999px;
 }
 
@@ -47,39 +47,39 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .panel {
-  @apply rounded-2xl border border-line bg-paper shadow-panel;
+  @apply rounded-2xl border border-zinc-800 bg-zinc-900 shadow-lg shadow-black/40;
 }
 
 .soft-btn {
-  @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-900 transition hover:border-mint/40 hover:bg-mintSoft hover:text-mintDim;
+  @apply inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 transition hover:border-teal-400/50 hover:bg-teal-400/10 hover:text-teal-300;
 }
 
 .mint-btn {
-  @apply inline-flex items-center gap-1.5 rounded-full bg-mint px-3.5 py-1.5 text-xs font-semibold text-white shadow-mint transition hover:bg-mintDim disabled:cursor-not-allowed disabled:opacity-55;
+  @apply inline-flex items-center gap-1.5 rounded-full bg-teal-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-lg shadow-teal-400/20 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-55;
 }
 
 .field {
-  @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink-950 outline-none transition placeholder:text-ink-600 focus:border-mint focus:ring-2 focus:ring-mint/20;
+  @apply w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-teal-400/60 focus:ring-2 focus:ring-teal-400/20;
 }
 
 .chip {
-  @apply rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink-800 transition hover:border-mint/40 hover:text-mintDim;
+  @apply rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-teal-400/50 hover:text-teal-300;
 }
 
 .chip-on {
-  @apply border-mint bg-mint font-semibold text-white shadow-mint;
+  @apply border-teal-400 bg-teal-400 font-semibold text-zinc-950 shadow-lg shadow-teal-400/20;
 }
 
 .section-title {
-  @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700;
+  @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400;
 }
 
 .switch {
-  @apply relative h-5 w-9 shrink-0 rounded-full bg-slate-300 transition;
+  @apply relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition;
 }
 
 .switch[data-on="true"] {
-  @apply bg-mint;
+  @apply bg-teal-400;
 }
 
 .switch::after {

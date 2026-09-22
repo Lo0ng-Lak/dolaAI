@@ -14,24 +14,24 @@ export default function Header() {
   const fileRef = useRef(null);
   const runtime = runtimeBadge();
 
-  const itemCls = (active) => `soft-btn ${active ? "border-mint bg-mintSoft text-mintDim" : ""}`;
+  const itemCls = (active) => `soft-btn ${active ? "border-teal-400/50 bg-teal-400/10 text-teal-300" : ""}`;
 
   return (
-    <header className="flex items-center justify-between border-b border-line bg-white px-5 py-3">
+    <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-5 py-3">
       <button type="button" onClick={() => setPage("dashboard")} className="flex items-center gap-3 text-left">
-        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-mint text-sm font-bold text-white shadow-mint">
+        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-teal-400 text-sm font-bold text-[#08110f] shadow-teal-400/20">
           P
         </span>
         <span>
           <span className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold tracking-tight text-ink-950">PLENKEX UNLIMITED</span>
-            <span className="rounded-full bg-mintSoft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-mintDim">
+            <span className="text-[15px] font-semibold tracking-tight text-zinc-50">PLENKEX UNLIMITED</span>
+            <span className="rounded-full bg-teal-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-300">
               Seedance 2.5 Pro
             </span>
           </span>
-          <span className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-700">
+          <span className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-400">
             DragonBMT · 30/60s · Lanczos không watermark
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700" title={runtime.detail}>
+            <span className="rounded-full bg-teal-400/10 px-2 py-0.5 text-[10px] font-medium text-teal-300" title={runtime.detail}>
               {runtime.label}
             </span>
           </span>
@@ -57,7 +57,7 @@ export default function Header() {
         <button type="button" className={itemCls(overlay === "accounts")} onClick={() => setOverlay("accounts")}>
           <Users size={14} />
           Tài khoản
-          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-ink-800">{accounts.length}</span>
+          <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-200">{accounts.length}</span>
         </button>
         <button type="button" className={itemCls(overlay === "proxy")} onClick={() => setOverlay("proxy")}>
           <Shield size={14} />

@@ -62,7 +62,7 @@ export function makeAccount(email, extras = {}, existingCount = 0) {
     accent: extras.accent || ACCENTS[existingCount % ACCENTS.length],
     proxyMode: extras.proxyMode || "direct",
     proxyId: extras.proxyId || "",
-    dailyLimit: extras.dailyLimit === 1 ? 1 : DEFAULT_DAILY_LIMIT,
+    dailyLimit: extras.dailyLimit === 1 || extras.dailyLimit === 2 || extras.dailyLimit === 3 ? extras.dailyLimit : DEFAULT_DAILY_LIMIT,
     sentToday: extras.sentToday || 0,
     sentDate: extras.sentDate || null,
     sessionOk: extras.sessionOk || false,
