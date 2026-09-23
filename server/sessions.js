@@ -144,7 +144,7 @@ function startProxyRelay(proxy) {
         method: req.method,
         path: req.url,
         headers,
-        timeout: 25000,
+        timeout: 120000,
       },
       (up) => {
         res.writeHead(up.statusCode || 502, up.headers);
@@ -159,6 +159,9 @@ function startProxyRelay(proxy) {
   });
 
   server.on("connect", (req, clientSocket, head) => {
+    // Idle timeout only guards the CONNECT handshake. Once tunnelled, Chrome keeps
+    // pooled connections open; killing them mid-idle breaks uploads and chat POSTs.
+    let tunnelled = false;
     const socket = net.connect({ host: upstreamHost, port: upstreamPort }, () => {
       let payload = `CONNECT ${req.url} HTTP/1.1\r\nHost: ${req.url}\r\n`;
       if (auth) payload += `Proxy-Authorization: ${auth}\r\n`;
@@ -179,6 +182,12 @@ function startProxyRelay(proxy) {
           socket.destroy();
           return;
         }
+        tunnelled = true;
+        socket.setTimeout(0);
+        socket.setKeepAlive(true, 30000);
+        clientSocket.setKeepAlive(true, 30000);
+        socket.setNoDelay(true);
+        clientSocket.setNoDelay(true);
         clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
         if (rest.length) clientSocket.write(rest);
         socket.pipe(clientSocket);
@@ -187,9 +196,11 @@ function startProxyRelay(proxy) {
       socket.on("data", onData);
     });
     socket.setTimeout(20000, () => {
+      if (tunnelled) return;
       socket.destroy();
       clientSocket.destroy();
     });
+    socket.on("close", () => clientSocket.destroy());
     socket.on("error", () => clientSocket.destroy());
     clientSocket.on("error", () => socket.destroy());
     clientSocket.on("close", () => socket.destroy());

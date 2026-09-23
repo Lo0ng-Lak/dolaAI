@@ -342,6 +342,28 @@ export function AppProvider({ children }) {
     setProxies(await readJson(res));
   };
 
+  const checkProxy = async (id) => {
+    setProxies((prev) => prev.map((item) => (item.id === id ? { ...item, status: "checking", lastError: "" } : item)));
+    const res = await fetch(`/api/proxies/${id}/check`, { method: "POST" });
+    const data = await readJson(res);
+    if (data.proxies) setProxies(data.proxies);
+    if (!res.ok) addLog("error", data.error || "Không kiểm tra được proxy.");
+    return data;
+  };
+
+  const checkAllProxies = async (ids) => {
+    const res = await fetch("/api/proxies/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ids || [] }),
+    });
+    const data = await readJson(res);
+    if (data.proxies) setProxies(data.proxies);
+    else await refreshData();
+    if (!res.ok) addLog("error", data.error || "Không kiểm tra được proxy.");
+    return data;
+  };
+
   const upscaleLocalVideos = async (files) => {
     if (settings.resolution === "off") {
       addLog("info", "Lanczos Pro đang tắt — giữ 720p gốc.");
@@ -547,6 +569,8 @@ export function AppProvider({ children }) {
       proxies,
       addProxy,
       removeProxy,
+      checkProxy,
+      checkAllProxies,
       openDola,
       runTasks,
       cancelRun,

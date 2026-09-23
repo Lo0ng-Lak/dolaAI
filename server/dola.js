@@ -277,7 +277,110 @@ async function holdSession(page, snap, log) {
   return true;
 }
 
+const NET_KEEP = 30;
+const NET_ERROR_BODY =
+  /high demand|try again later|too many requests|system error|internal server error|"is_limit"\s*:\s*true|"status_code"\s*:\s*[1-9]|"error_code"\s*:\s*[1-9]|"code"\s*:\s*"?(?:4\d\d|5\d\d)\b/i;
+const UPLOAD_OK_URL = /CommitImageUpload|CommitUpload|commit_upload|upload.*commit|\/upload\b|tos-[^/]*\/.+|ibytedtos|imagex|bytevcloud/i;
+
+function pushNet(page, entry) {
+  const list = page._dolaNet || (page._dolaNet = []);
+  list.push({ at: Date.now(), ...entry });
+  if (list.length > NET_KEEP) list.splice(0, list.length - NET_KEEP);
+}
+
+function shortUrl(url) {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}${u.pathname}`.slice(0, 90);
+  } catch {
+    return String(url || "").slice(0, 90);
+  }
+}
+
+function attachNetWatch(page) {
+  if (!page || page._dolaNetWatch) return;
+  page._dolaNetWatch = true;
+  page.on("requestfailed", (request) => {
+    const url = request.url();
+    if (!/dola\.com|byteintl|ibytedtos|bytedance|dola\.ai/i.test(url)) return;
+    const type = request.resourceType();
+    if (type !== "fetch" && type !== "xhr" && type !== "document" && type !== "eventsource") return;
+    const reason = request.failure()?.errorText || "failed";
+    if (/ERR_ABORTED/i.test(reason)) return;
+    pushNet(page, { kind: "fail", method: request.method(), url: shortUrl(url), reason });
+  });
+  page.on("response", async (response) => {
+    const request = response.request();
+    const url = response.url();
+    const uploadHost = /ibytedtos|byteintl|volces|bytevcloud|imagex|tos-|upload/i.test(url);
+    if (!/dola\.com/i.test(url) && !uploadHost) return;
+    const type = request.resourceType();
+    if (type !== "fetch" && type !== "xhr") return;
+    const status = response.status();
+    const method = request.method();
+    if (
+      status >= 200 &&
+      status < 300 &&
+      (method === "POST" || method === "PUT") &&
+      UPLOAD_OK_URL.test(url)
+    ) {
+      const list = page._dolaUploads || (page._dolaUploads = []);
+      list.push({ at: Date.now(), url: shortUrl(url), commit: /commit/i.test(url) });
+      if (list.length > NET_KEEP) list.splice(0, list.length - NET_KEEP);
+    }
+    if (uploadHost && status < 400) return;
+    const post = method === "POST";
+    if (!post && status < 400) return;
+    const rewrote = await page.evaluate(() => window.__DOLA_REWRITE_READY === true).catch(() => null);
+    let body = "";
+    if (status >= 400 || post) {
+      body = await Promise.race([
+        response.text().catch(() => ""),
+        sleepMs(20000).then(() => ""),
+      ]);
+    }
+    const snippet = String(body || "").replace(/\s+/g, " ");
+    const isJson = /^\s*[{[]/.test(snippet);
+    const bad = status >= 400 || (isJson && NET_ERROR_BODY.test(snippet));
+    if (!bad) return;
+    const hit = snippet.match(NET_ERROR_BODY);
+    const at = hit ? Math.max(0, hit.index - 80) : 0;
+    pushNet(page, {
+      kind: "http",
+      method: request.method(),
+      url: shortUrl(url),
+      status,
+      rewrote,
+      body: snippet.slice(at, at + 240),
+    });
+  });
+}
+
+function explainNet(page, log, sinceMs = 30000) {
+  const list = (page?._dolaNet || []).filter((item) => Date.now() - item.at <= sinceMs);
+  if (!list.length) {
+    log("info", "Mạng: không thấy request Dola nào lỗi — lỗi đến từ phía Dola trả lời trong chat.");
+    return { proxy: false, rewrite: false, server: true };
+  }
+  let proxy = false;
+  let rewrite = false;
+  for (const item of list.slice(-4)) {
+    if (item.kind === "fail") {
+      proxy = proxy || /TUNNEL|PROXY|CONNECTION|TIMED_OUT|NETWORK|RESET|CLOSED|SSL/i.test(item.reason);
+      log("warn", `Mạng: ${item.method} ${item.url} hỏng (${item.reason}) — thường do proxy.`);
+    } else {
+      rewrite = rewrite || item.rewrote === true;
+      log(
+        "warn",
+        `Mạng: ${item.method} ${item.url} → ${item.status}${item.rewrote ? " (lúc DragonBMT đang đổi request)" : " (request gốc, chưa đổi)"}${item.body ? ` · ${item.body}` : ""}`,
+      );
+    }
+  }
+  return { proxy, rewrite, server: !proxy && !rewrite };
+}
+
 async function gotoDola(page, log, { viaProxy = Boolean(page?._viaProxy), reload = false, timeout = 25000 } = {}) {
+  attachNetWatch(page);
   await page.bringToFront().catch(() => {});
   if (page.url().startsWith("chrome-extension://")) {
     throw new Error("Đang đứng ở cửa sổ extension, không phải tab Dola.");
@@ -288,7 +391,8 @@ async function gotoDola(page, log, { viaProxy = Boolean(page?._viaProxy), reload
     if (ready) {
       log?.("info", "Tab Dola đã mở ô chat — đợi trang đứng yên.");
       await maybeSolveCaptcha(page, log);
-      await sleepMs(600);
+      await reloadDolaForExtension(page, log);
+      await sleepMs(400);
       return;
     }
   }
@@ -298,7 +402,8 @@ async function gotoDola(page, log, { viaProxy = Boolean(page?._viaProxy), reload
     const ready = await waitForComposer(page, log, 12000);
     if (!ready) throw new Error("Dola mở xong nhưng chưa hiện ô chat. Không gửi khi còn trang trắng / trang chủ chưa load.");
     await maybeSolveCaptcha(page, log);
-    await sleepMs(800);
+    await reloadDolaForExtension(page, log);
+    await sleepMs(400);
   } catch (err) {
     const msg = String(err?.message || err);
     if (/ERR_PROXY|ERR_TUNNEL|ERR_SOCKS|ERR_CONNECTION|Timeout|timed out/i.test(msg)) {
@@ -317,7 +422,7 @@ export async function openAccountBrowser(accountId, log) {
   log("info", `${account.email}: mở trình duyệt cài đặt trên ${proxyLabel || (viaProxy ? "proxy đã chọn" : "IP máy")}.`);
   await gotoDola(page, log, { viaProxy, reload: false });
   const state = await inspectSession(page, log, context);
-  await waitForStudioRelay(page, log, 800);
+  await waitForStudioRelay(page, log, 5000);
   if (state.needLogin) {
     await markAccount(accountId, { status: "need_login", sessionOk: false, lastCheck: new Date().toISOString() });
     log("warn", `${account.email}: chưa login — ${state.reason} Giữ Chrome để đăng nhập.`);
@@ -369,26 +474,55 @@ async function isCreateVideoMode(page) {
     .catch(() => false);
 }
 
+async function waitUntilCreateVideo(page, ms = 10000) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await isCreateVideoMode(page)) return true;
+    await maybeSolveCaptcha(page, null);
+    await sleepMs(160);
+  }
+  return isCreateVideoMode(page);
+}
+
+async function lockRewriteOff(page) {
+  await armFetchGate(page);
+  await page
+    .evaluate(() => {
+      window.__DOLA_REWRITE_READY = false;
+    })
+    .catch(() => {});
+}
+
+async function createVideoStable(page, holdMs = 700) {
+  if (!(await isCreateVideoMode(page))) return false;
+  await sleepMs(holdMs);
+  return isCreateVideoMode(page);
+}
+
+// The Create Videos chip is a toggle: clicking it while the mode is on turns it off.
 async function selectCreateVideo(page, log) {
   await maybeSolveCaptcha(page, log);
-  if (await isCreateVideoMode(page)) {
-    log("info", "Đã ở Create Videos — nút Model đang hiện trên thanh chat.");
+  if (await createVideoStable(page)) {
+    log("info", "Đang ở Create Videos (nút Model hiện ổn định) — không bấm chip, qua bước sau.");
     return;
   }
-  log("info", "Đang ở trang chủ — bấm chip Create Videos.");
-  const clicked = await clickCreateVideoChip(page).catch(() => "");
-  if (!clicked) throw new Error("Không thấy chip Create Videos trên trang chủ Dola.");
-  log("info", `Đã bấm ${clicked} — đợi nút Model hiện ra.`);
-  const deadline = Date.now() + 10000;
-  while (Date.now() < deadline) {
-    if (await isCreateVideoMode(page)) {
-      log("info", "Đã vào Create Videos — nút Model đang hiện.");
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    if (await createVideoStable(page, 300)) {
+      log("info", "Đã vào Create Videos — nút Model hiện ổn định. Mới qua bước chọn mode.");
       return;
     }
-    await maybeSolveCaptcha(page, log);
-    await sleepMs(200);
+    log("info", `Chưa ở Create Videos — bấm chip Create Videos (lần ${attempt}).`);
+    const clicked = await clickCreateVideoChip(page).catch(() => "");
+    if (!clicked) throw new Error("Không thấy chip Create Videos trên Dola.");
+    if (!(await waitUntilCreateVideo(page, 8000))) continue;
+    await waitForComposer(page, null, 4000);
+    if (await createVideoStable(page)) {
+      log("info", "Đã vào Create Videos — nút Model hiện ổn định. Mới qua bước chọn mode.");
+      return;
+    }
+    log("warn", `Lần ${attempt}: nút Model hiện rồi mất — kiểm tra lại.`);
   }
-  throw new Error("Bấm Create Videos rồi nhưng trang vẫn trang chủ — không thấy nút Model. Không gửi.");
+  throw new Error("Bấm Create Videos nhưng nút Model không đứng yên. Không gửi.");
 }
 
 async function selectFastMode(page, log) {
@@ -520,12 +654,25 @@ async function clickModeInMenu(page, key) {
   return "";
 }
 
+async function waitForModelOnToolbar(page, choice, ms = 2500) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    const label = await readVideoModelLabel(page);
+    if (toolbarHasModel(label, choice.key)) return label;
+    await sleepMs(80);
+  }
+  return "";
+}
+
 async function selectConfiguredModel(page, settings, log) {
   await maybeSolveCaptcha(page, log);
+  if (!(await isCreateVideoMode(page))) {
+    throw new Error("Chưa vào Create Videos — không chọn model khi còn trang chủ.");
+  }
   const choice = modelChoice(settings);
   let label = await readVideoModelLabel(page);
   if (toolbarHasModel(label, choice.key)) {
-    log("info", `Nút Model đang ${choice.label} — bỏ qua.`);
+    log("info", `Nút Model đang ${choice.label} — bước này xong.`);
     return;
   }
   if (!label) {
@@ -536,33 +683,36 @@ async function selectConfiguredModel(page, settings, log) {
     }
     if (!label) throw new Error("Không thấy nút Model trên thanh chat.");
     if (toolbarHasModel(label, choice.key)) {
-      log("info", `Nút Model đang ${choice.label} — bỏ qua.`);
+      log("info", `Nút Model đang ${choice.label} — bước này xong.`);
       return;
     }
   }
 
-  log("info", `Bấm nút Model rồi chọn ${choice.label}...`);
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  log("info", `Bấm nút Model rồi chọn ${choice.label} — đợi nút đổi chữ thì mới qua.`);
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    if (!(await isCreateVideoMode(page))) {
+      throw new Error("Mất Create Videos khi chọn model. Không chọn model khi còn trang chủ.");
+    }
     const opened = await menuIsOpen(page);
     if (!opened) {
       const clicked = await clickVideoModelButton(page);
       if (!clicked) throw new Error("Không bấm được nút Model trên thanh chat.");
-      const waitUntil = Date.now() + 700;
+      const waitUntil = Date.now() + 900;
       while (Date.now() < waitUntil && !(await menuIsOpen(page))) await sleepMs(50);
     }
     if (!(await menuIsOpen(page))) {
       log("info", `Lần ${attempt}: menu chưa mở, bấm lại.`);
       continue;
     }
-    const hit = await clickModeInMenu(page, choice.key);
-    await sleepMs(120);
-    const next = await readVideoModelLabel(page);
-    if (hit || toolbarHasModel(next, choice.key)) {
-      log("info", `Đã chọn ${choice.label}.`);
+    await clickModeInMenu(page, choice.key);
+    const confirmed = await waitForModelOnToolbar(page, choice, 2200);
+    if (confirmed) {
+      log("info", `Đã chọn ${choice.label} — nút Model đang hiện đúng. Mới qua bước nhập prompt.`);
       return;
     }
+    log("info", `Lần ${attempt}: đã bấm nhưng nút Model chưa đổi thành ${choice.label} — làm lại.`);
   }
-  throw new Error(`Không chọn được ${choice.label} trong menu Model.`);
+  throw new Error(`Chưa thấy ${choice.label} trên nút Model. Không qua bước gửi.`);
 }
 
 async function writeImages(images) {
@@ -578,6 +728,147 @@ async function writeImages(images) {
   return { dir, files };
 }
 
+async function readAttachmentState(page, baseKeys = []) {
+  return page
+    .evaluate((baseKeys) => {
+      const visible = (el) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return (
+          rect.width > 4 &&
+          rect.height > 4 &&
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          Number(style.opacity || "1") > 0.05
+        );
+      };
+      const empty = { keys: [], newKeys: [], thumbs: 0, loaded: 0, busy: 0, errors: 0, tip: "", failedText: false, found: false };
+      const box = [...document.querySelectorAll('[contenteditable="true"], textarea')].find(visible);
+      if (!box) return empty;
+      const boxRect = box.getBoundingClientRect();
+      const inZone = (rect) =>
+        rect.right > boxRect.left - 160 &&
+        rect.left < boxRect.right + 160 &&
+        rect.bottom > boxRect.top - 320 &&
+        rect.top < boxRect.bottom + 160;
+      const bgUrl = (el) => {
+        const match = /url\(["']?([^"')]+)["']?\)/i.exec(getComputedStyle(el).backgroundImage || "");
+        return match ? match[1] : "";
+      };
+      const candidates = [];
+      for (const el of document.querySelectorAll("img, div, span, button, figure, li")) {
+        if (!visible(el)) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 24 || rect.height < 24 || rect.width > 420 || rect.height > 420) continue;
+        if (!inZone(rect)) continue;
+        const src = el.tagName === "IMG" ? el.currentSrc || el.src || "" : bgUrl(el);
+        if (!/^(blob:|data:image|https?:)/i.test(src)) continue;
+        if (/\.svg(\?|$)|avatar|logo|icon|emoji/i.test(src)) continue;
+        const loaded = el.tagName === "IMG" ? el.complete && el.naturalWidth > 0 : true;
+        candidates.push({ el, key: src.slice(0, 300), loaded });
+      }
+      const skip = new Set(Array.isArray(baseKeys) ? baseKeys : []);
+      const fresh = candidates.filter((item) => !skip.has(item.key));
+      const holderOf = (el) => {
+        const own = el.getBoundingClientRect();
+        let holder = el;
+        for (let i = 0; i < 4 && holder.parentElement; i += 1) {
+          const parent = holder.parentElement;
+          const rect = parent.getBoundingClientRect();
+          if (rect.width > own.width * 2.5 + 40 || rect.height > own.height * 2.5 + 40) break;
+          holder = parent;
+        }
+        return holder;
+      };
+      let busy = 0;
+      let errors = 0;
+      let tip = "";
+      for (const item of fresh) {
+        const holder = holderOf(item.el);
+        busy += [...holder.querySelectorAll(
+          '[role="progressbar"], progress, [aria-busy="true"], [class*="loading" i], [class*="spinner" i], [class*="uploading" i], [class*="animate-spin"]',
+        )].filter(visible).length;
+        const bad = [...holder.querySelectorAll(
+          '[class*="error" i], [class*="fail" i], [data-status="error"], [data-status="failed"]',
+        )].filter(visible).length;
+        const bangs = [...holder.querySelectorAll("span, div, i")].filter(
+          (el) => visible(el) && el.children.length === 0 && (el.textContent || "").trim() === "!",
+        ).length;
+        errors += bad + bangs;
+        if (!tip) {
+          tip = [...holder.querySelectorAll("[title], [aria-label]")]
+            .map((el) => `${el.getAttribute("title") || ""} ${el.getAttribute("aria-label") || ""}`.trim())
+            .find((value) => /fail|error|retry|violat|large|support|lỗi/i.test(value)) || "";
+        }
+      }
+      let zoneText = "";
+      let node = box;
+      for (let i = 0; i < 6 && node.parentElement; i += 1) node = node.parentElement;
+      zoneText = String(node.innerText || "").toLowerCase();
+      return {
+        keys: candidates.map((item) => item.key),
+        newKeys: fresh.map((item) => item.key),
+        thumbs: fresh.length,
+        loaded: fresh.filter((item) => item.loaded).length,
+        busy,
+        loadingText: /uploading|đang tải lên|processing image/.test(zoneText),
+        errors,
+        failedText: /upload failed|failed to upload|tải lên thất bại|image too large/.test(zoneText),
+        tip: tip.slice(0, 160),
+        found: true,
+      };
+    }, baseKeys)
+    .catch(() => ({ keys: [], newKeys: [], thumbs: 0, loaded: 0, busy: 0, errors: 0, tip: "", failedText: false, found: false }));
+}
+
+async function waitImagesUploaded(page, want, base, log, ms = 60000) {
+  const startedAt = Date.now();
+  const deadline = startedAt + ms;
+  const baseKeys = base.keys || [];
+  let stableSince = 0;
+  let last = null;
+  let netOk = 0;
+  while (Date.now() < deadline) {
+    await maybeSolveCaptcha(page, log);
+    const state = await readAttachmentState(page, baseKeys);
+    state.loading = state.busy > 0 || (state.loadingText && !base.loadingText);
+    last = state;
+    const uploads = (page._dolaUploads || []).filter((item) => item.at >= startedAt);
+    const commits = uploads.filter((item) => item.commit).length;
+    netOk = commits || uploads.length;
+    if ((state.failedText && !base.failedText) || state.errors > 0) {
+      explainNet(page, log, 90000);
+      throw Object.assign(
+        new Error(
+          `Ảnh hiện dấu ! — Dola không nhận ảnh${state.tip ? ` (${state.tip})` : ""}. Không gửi prompt khi ảnh chưa lên.`,
+        ),
+        { imageRejected: true },
+      );
+    }
+    const domReady = state.thumbs >= want && state.loaded >= want && !state.loading;
+    const netReady = netOk >= want && !state.loading;
+    if (domReady || netReady) {
+      if (!stableSince) stableSince = Date.now();
+      const hold = domReady ? 1200 : commits >= want ? 1500 : 4000;
+      if (Date.now() - stableSince >= hold) {
+        const how = domReady
+          ? `thấy ${state.thumbs} ảnh xem trước, hết vòng tải`
+          : `máy chủ ảnh đã nhận ${netOk} lượt upload, không còn vòng tải`;
+        log("info", `Đã tải lên xong ${want}/${want} ảnh (${how}). Mới dán prompt.`);
+        return true;
+      }
+    } else {
+      stableSince = 0;
+    }
+    await sleepMs(300);
+  }
+  explainNet(page, log, ms + 5000);
+  throw new Error(
+    `Ảnh chưa tải lên xong (thấy ${last?.thumbs || 0}/${want} ảnh xem trước, ${netOk} upload thành công${last?.loading ? ", vẫn đang tải" : ""}) sau ${Math.round(ms / 1000)}s. Không gửi prompt.`,
+  );
+}
+
 async function uploadImages(page, files, log) {
   if (!files.length) {
     log("warn", "Task không có ảnh tham chiếu — chỉ gửi prompt.");
@@ -589,9 +880,62 @@ async function uploadImages(page, files, log) {
     input = page.locator('input[type="file"]').first();
   }
   if ((await input.count()) === 0) throw new Error("Không thấy ô tải ảnh trên Dola.");
+  const base = await readAttachmentState(page);
   await input.setInputFiles(files);
-  log("info", `Đã gửi ${files.length} ảnh tham chiếu.`);
-  await page.waitForTimeout(200);
+  log("info", `Đang tải ${files.length} ảnh tham chiếu lên Dola — đợi xong mới dán prompt.`);
+  await waitImagesUploaded(page, files.length, base, log);
+}
+
+async function readComposerState(page, snippet) {
+  return page
+    .evaluate((needle) => {
+      const visible = (el) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return (
+          rect.width > 16 &&
+          rect.height > 12 &&
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          Number(style.opacity || "1") > 0.1
+        );
+      };
+      const box = [...document.querySelectorAll('[contenteditable="true"], textarea')].find(visible);
+      const inBox = String(box?.innerText || box?.value || "").replace(/\s+/g, " ").trim();
+      const bubbles = [...document.querySelectorAll('[data-message-author], [data-role="user"], article, [class*="message"]')]
+        .map((el) => String(el.innerText || "").replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+      const body = String(document.body?.innerText || "").replace(/\s+/g, " ");
+      const exact = needle.length <= 4;
+      const match = (text) => (exact ? new RegExp(`^${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i").test(text) : text.includes(needle));
+      const hits = bubbles.filter(match).length;
+      return {
+        inBox: Boolean(needle) && inBox.includes(needle),
+        inThread: Boolean(needle) && bubbles.some(match),
+        onPage: Boolean(needle) && (exact ? new RegExp(`(?:^|\\s)${needle}(?:\\s|$)`, "i").test(body) : body.includes(needle)),
+        boxLen: inBox.length,
+        hits,
+      };
+    }, snippet)
+    .catch(() => ({ inBox: false, inThread: false, onPage: false, boxLen: 0, hits: 0 }));
+}
+
+async function requireComposerReady(page, settings, log) {
+  const choice = modelChoice(settings);
+  if (!(await isCreateVideoMode(page))) {
+    log("warn", "Mất Create Videos trước khi nhập — làm lại từ bước 1.");
+    await prepareComposer(page, settings, log);
+    return;
+  }
+  const label = await readVideoModelLabel(page);
+  if (!toolbarHasModel(label, choice.key)) {
+    log("warn", `Nút Model chưa phải ${choice.label} — chọn lại rồi mới nhập.`);
+    await selectConfiguredModel(page, settings, log);
+  }
+  if (!(await isCreateVideoMode(page))) {
+    throw new Error("Mất Create Videos sau khi chọn model. Không nhập prompt.");
+  }
 }
 
 async function fillPrompt(page, prompt, log) {
@@ -633,12 +977,18 @@ async function fillPrompt(page, prompt, log) {
   if (!wrote.value.includes(snippet)) {
     throw new Error("Ô chat vẫn trống / không nhận prompt. Đang ở trang chủ thì không gửi.");
   }
-  log("info", `Đã dán prompt vào ô chat đang hiện (${wrote.value.slice(0, 40)}…).`);
+  const check = await readComposerState(page, snippet);
+  if (!check.inBox) {
+    throw new Error("Dán xong nhưng ô chat không còn prompt. Không bấm gửi.");
+  }
+  log("info", `Đã dán prompt vào ô chat đang hiện (${wrote.value.slice(0, 40)}…). Mới gửi.`);
 }
 
 async function sendMessage(page, prompt, log) {
   await maybeSolveCaptcha(page, log);
   const snippet = String(prompt || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  const before = await readComposerState(page, snippet);
+  const beforeHits = Number(before.hits || 0);
   await page.evaluate(() => {
     const visible = (el) => {
       if (!el) return false;
@@ -658,34 +1008,20 @@ async function sendMessage(page, prompt, log) {
     el?.focus();
   });
   await page.keyboard.press("Enter");
-  const deadline = Date.now() + 8000;
+  let pressed = 1;
+  const started = Date.now();
+  const deadline = started + 8000;
   while (Date.now() < deadline) {
-    const state = await page
-      .evaluate((needle) => {
-        const visible = (el) => {
-          if (!el) return false;
-          const rect = el.getBoundingClientRect();
-          const style = getComputedStyle(el);
-          return (
-            rect.width > 16 &&
-            rect.height > 12 &&
-            style.visibility !== "hidden" &&
-            style.display !== "none" &&
-            Number(style.opacity || "1") > 0.1
-          );
-        };
-        const box = [...document.querySelectorAll('[contenteditable="true"], textarea')].find(visible);
-        const inBox = String(box?.innerText || box?.value || "").replace(/\s+/g, " ").trim();
-        const bubbles = [...document.querySelectorAll('[data-message-author], [data-role="user"], article, [class*="message"]')]
-          .map((el) => String(el.innerText || "").replace(/\s+/g, " ").trim())
-          .filter(Boolean);
-        const inThread = bubbles.some((text) => text.includes(needle));
-        return { inBox: inBox.includes(needle), inThread, boxLen: inBox.length };
-      }, snippet)
-      .catch(() => ({ inBox: true, inThread: false }));
-    if (state.inThread || !state.inBox) {
-      log("info", "Đã gửi bằng Enter — thấy tin trên khung chat.");
+    const state = await readComposerState(page, snippet);
+    const grew = Number(state.hits || 0) > beforeHits;
+    const firstClear = beforeHits === 0 && !state.inBox && (state.inThread || state.onPage);
+    if (grew || firstClear) {
+      log("info", "Đã gửi bằng Enter — thấy tin mới trên khung chat. Mới qua bước tiếp.");
       return;
+    }
+    if (state.inBox && Number(state.hits || 0) <= beforeHits && Date.now() - started > 4000 && pressed < 2) {
+      await page.keyboard.press("Enter");
+      pressed += 1;
     }
     await sleepMs(200);
   }
@@ -706,8 +1042,25 @@ export async function waitForStudioRelay(page, log, timeout = 12000) {
     )
     .catch(() => null);
   if (!ready) return false;
-  log("info", "DragonBMT đang chạy cùng tab Dola.");
+  log?.("info", "DragonBMT đang chạy cùng tab Dola.");
   return true;
+}
+
+async function reloadDolaForExtension(page, log) {
+  if (page._dolaExtReloaded) {
+    return waitForStudioRelay(page, log, 4000);
+  }
+  log?.("info", "Tải lại Dola một lần để tab nhận DragonBMT.");
+  await page.reload({ waitUntil: "load", timeout: 25000 });
+  page._dolaExtReloaded = true;
+  const ready = await waitForComposer(page, log, 12000);
+  if (!ready) {
+    log?.("warn", "Reload Dola xong chưa thấy ô chat.");
+  }
+  await maybeSolveCaptcha(page, log);
+  const ok = await waitForStudioRelay(page, log, 8000);
+  if (!ok) log?.("warn", "Reload xong vẫn chưa thấy DragonBMT trên tab.");
+  return ok;
 }
 
 async function pickActionBarOption(page, keyHint, match) {
@@ -746,7 +1099,11 @@ async function requireStudioRelay(page, settings, log) {
   if (!/dola\.com/i.test(page.url())) {
     await gotoDola(page, log, { reload: false });
   }
-  const attached = await waitForStudioRelay(page, log, 5000);
+  let attached = await waitForStudioRelay(page, log, 2500);
+  if (!attached) {
+    page._dolaExtReloaded = false;
+    attached = await reloadDolaForExtension(page, log);
+  }
   await armFetchGate(page);
   if (!attached) log("warn", "Chưa thấy DragonBMT trên tab — vẫn gửi prompt, ép 30/60 sau khi Dola hỏi 15s.");
 }
@@ -795,21 +1152,24 @@ async function readDolaReplyState(page, { promptSnippet = "" } = {}) {
       };
       const nodes = [...document.querySelectorAll('[data-message-author], [data-role], article, [class*="message"], [class*="Message"]')];
       const hint = String(needle || "").replace(/\s+/g, " ").trim().slice(0, 24);
-      let afterUser = !hint;
-      let after = "";
+      const texts = [];
       for (const el of nodes) {
         if (!visible(el) && el !== document.body) continue;
         const t = String(el.innerText || "").replace(/\s+/g, " ").trim();
-        if (!t) continue;
-        if (!afterUser && hint && t.includes(hint)) {
-          afterUser = true;
-          continue;
-        }
-        if (afterUser) after += `\n${t}`;
+        if (t) texts.push(t);
       }
-      if (!afterUser || !after.trim()) {
+      let lastUser = -1;
+      const exact = hint.length <= 4;
+      if (hint) {
+        for (let i = 0; i < texts.length; i += 1) {
+          if (exact ? texts[i].toLowerCase() === hint.toLowerCase() : texts[i].includes(hint)) lastUser = i;
+        }
+      }
+      let after = lastUser >= 0 ? texts.slice(lastUser + 1).join("\n") : "";
+      let afterUser = lastUser >= 0;
+      if (!exact && (!afterUser || !after.trim())) {
         const body = String(document.body?.innerText || "");
-        const idx = hint ? body.toLowerCase().indexOf(hint.toLowerCase()) : -1;
+        const idx = hint ? body.toLowerCase().lastIndexOf(hint.toLowerCase()) : -1;
         if (idx >= 0) {
           after = body.slice(idx + hint.length);
           afterUser = true;
@@ -817,21 +1177,29 @@ async function readDolaReplyState(page, { promptSnippet = "" } = {}) {
       }
       const source = after.toLowerCase();
       if (!afterUser || !source.trim()) {
-        return { refused: false, generating: false, scoped: false };
+        return { refused: false, generating: false, busy: false, systemError: false, networkError: false, scoped: false };
       }
       const refused =
         /would you like me to proceed with 15|nearest supported duration of 15|supports durations from 4 to 15|proceed with 15 seconds|tôi có thể tạo.*15|chỉ tối đa 15/.test(source) ||
-        (/15\s*second|15\s*s|tối đa\s*15/.test(source) &&
-          /proceed|nearest|unsupport|không hỗ trợ|không thể|not support|can't|cannot|unable|only support/.test(source));
+        (/15\s*-?\s*second|15\s*s\b|15\s*giây|tối đa\s*15|up to 15|maximum (?:of |duration (?:is |of )?)?15|limit(?:ed)? to 15/.test(source) &&
+          /proceed|nearest|unsupport|không hỗ trợ|không thể|chỉ (?:có thể|hỗ trợ|tạo)|tối đa|not support|can't|cannot|can only|unable|only support|maximum|limit|up to|would you like|do you want|shall i/.test(source)) ||
+        (/\b(?:30|60)\s*(?:s\b|-?\s*second|giây)/.test(source) &&
+          /not (?:currently )?support|unsupport|không hỗ trợ|không thể tạo|can't (?:generate|create|make)|cannot (?:generate|create|make)|unable to (?:generate|create|make)|exceeds?|too long|quá dài/.test(source));
       const generating =
         /đang tạo video|đang xử lý video|generating video now|creating video now|video is (queued|rendering)|rendering video/.test(source);
       const busy =
         /experiencing high demand|high demand right now|please try again later|too many requests|rate limit|server (is )?busy|quá tải|thử lại sau/.test(
           source,
         );
-      return { refused, generating, busy, scoped: true };
+      const systemError =
+        /system error|lỗi hệ thống|internal (server )?error|something went wrong|an error occurred|unexpected error/.test(source);
+      const networkError =
+        /network error|network connection|lỗi mạng|mất kết nối|connection (error|lost|failed)|failed to fetch|check your (network|connection)|offline/.test(
+          source,
+        );
+      return { refused, generating, busy, systemError, networkError, scoped: true };
     }, promptSnippet)
-    .catch(() => ({ refused: false, generating: false, scoped: false }));
+    .catch(() => ({ refused: false, generating: false, busy: false, systemError: false, networkError: false, scoped: false }));
 }
 
 async function waitFor15sLimit(page, log, { promptSnippet = "", ms = 45000 } = {}) {
@@ -839,14 +1207,18 @@ async function waitFor15sLimit(page, log, { promptSnippet = "", ms = 45000 } = {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     await maybeSolveCaptcha(page, log);
-    if (await isHighDemand(page)) {
-      log("warn", "Dola báo quá tải (high demand) — chưa phải logout.");
-      return "busy";
-    }
     if (await sessionKickedOut(page)) {
       throw new Error("Dola đá phiên lúc gửi. Không gửi thêm — login lại trên cửa sổ Chromium của tool.");
     }
     const state = await readDolaReplyState(page, { promptSnippet });
+    if (state.networkError) {
+      log("warn", "Dola báo Network error sau tin vừa gửi.");
+      return "network";
+    }
+    if (state.systemError) {
+      log("warn", "Dola báo System error sau đúng tin vừa gửi.");
+      return "error";
+    }
     if (state.busy) {
       log("warn", "Dola báo quá tải (high demand) — chưa phải logout.");
       return "busy";
@@ -881,44 +1253,85 @@ async function clickOkOn15sMessage(page) {
   }).catch(() => "");
 }
 
-async function continueSameTaskAfterRefusal(page, settings, log) {
+async function sendOkAfterCreateVideos(page, settings, log, { label = "OK" } = {}) {
   const duration = forcedDuration(settings);
-  if (await sessionKickedOut(page)) {
-    log("warn", "Mất phiên thật (trang Google login) — không gửi thêm.");
-    return false;
-  }
-  log("info", `Bước 5/5: chọn lại Create Videos rồi mới nhập OK. DragonBMT đổi request thành ${duration}.`);
+  const followUp = continueAfterDurationRefusal(settings);
   await maybeSolveCaptcha(page, log);
   await selectCreateVideo(page, log);
+  if (!(await isCreateVideoMode(page))) {
+    throw new Error("Chưa vào lại Create Videos — không nhập OK.");
+  }
+  const choice = modelChoice(settings);
+  const labelNow = await readVideoModelLabel(page);
+  if (!toolbarHasModel(labelNow, choice.key)) {
+    log("info", `Sau Create Videos, model chưa phải ${choice.label} — chọn lại rồi mới nhập ${label}.`);
+    await selectConfiguredModel(page, settings, log);
+  }
+  if (!(await isCreateVideoMode(page))) {
+    throw new Error("Mất Create Videos sau khi chọn model. Không nhập OK.");
+  }
   await applyStudioRelaySettings(page, settings, log);
-  const followUp = continueAfterDurationRefusal(settings);
-  const snap = await snapshotSession(page, page.context());
   await fillPrompt(page, followUp, log);
+  const snap = await snapshotSession(page, page.context());
   await sendMessage(page, followUp, log);
   await sleepMs(400);
   if (!(await holdSession(page, snap, log))) {
     throw new Error("Mất phiên lúc gửi OK. Không đánh hoàn thành — login lại rồi chạy lại task.");
   }
-  log("info", `Đã gửi OK sau Create Videos. DragonBMT đổi 15 → ${duration} trên request.`);
+  log("info", `Đã gửi ${label} sau Create Videos. DragonBMT đổi 15 → ${duration} trên request.`);
   return true;
+}
+
+async function continueSameTaskAfterRefusal(page, settings, log) {
+  if (await sessionKickedOut(page)) {
+    log("warn", "Mất phiên thật (trang Google login) — không gửi thêm.");
+    return false;
+  }
+  const duration = forcedDuration(settings);
+  log("info", `Bước 5/5: chọn lại Create Videos (xong mới nhập OK). DragonBMT đổi request thành ${duration}.`);
+  return sendOkAfterCreateVideos(page, settings, log, { label: "OK" });
 }
 
 export async function resendOkAfterFail(page, settings, log) {
-  log("info", "Dola lỗi tạo video — bấm Create Videos rồi nhập lại OK. Không đánh lỗi.");
-  await selectCreateVideo(page, log);
-  await applyStudioRelaySettings(page, settings, log);
-  const followUp = continueAfterDurationRefusal(settings);
-  await fillPrompt(page, followUp, log);
-  await sendMessage(page, followUp, log);
-  return true;
+  log("info", "Dola lỗi tạo video — bấm Create Videos, đợi xong rồi nhập lại OK. Không đánh lỗi.");
+  return sendOkAfterCreateVideos(page, settings, log, { label: "OK" });
 }
 
 async function prepareComposer(page, settings, log) {
-  log("info", "Bước 1/5: Create Videos — chỉ bỏ qua khi đã thấy nút Model.");
-  await selectCreateVideo(page, log);
-  log("info", "Bước 2/5: mở nút Model rồi chọn mode theo cài đặt.");
-  await selectConfiguredModel(page, settings, log);
+  const choice = modelChoice(settings);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    log("info", "Bước 1/5: Create Videos — chỉ bỏ qua khi đã thấy nút Model.");
+    await selectCreateVideo(page, log);
+    if (!(await isCreateVideoMode(page))) {
+      log("warn", `Lần ${attempt}: chưa vào Create Videos — làm lại.`);
+      continue;
+    }
+    log("info", "Bước 2/5: mở nút Model rồi chọn mode theo cài đặt — đợi nút đổi chữ.");
+    await selectConfiguredModel(page, settings, log);
+    const modeOk = await isCreateVideoMode(page);
+    const modelOk = toolbarHasModel(await readVideoModelLabel(page), choice.key);
+    if (modeOk && modelOk) {
+      log("info", `Đã xong Create Videos + ${choice.label} — mới qua bước nhập prompt.`);
+      return;
+    }
+    log("warn", `Lần ${attempt}: Create Videos / model chưa đứng yên — làm lại từ bước 1.`);
+  }
+  throw new Error("Chưa vào được Create Videos + model. Không gửi.");
 }
+
+async function openFreshChat(page, settings, log, reason) {
+  log("warn", `${reason} — mở chat Dola mới (không gửi chồng vào hội thoại lỗi), tắt đổi request.`);
+  await gotoDola(page, log, { reload: true });
+  if (await sessionKickedOut(page)) {
+    throw new Error("Phiên hết đăng nhập khi mở chat mới. Login lại rồi chạy.");
+  }
+  await requireStudioRelay(page, settings, log);
+  await lockRewriteOff(page);
+  await prepareComposer(page, settings, log);
+}
+
+const RETRY_WAIT_SEC = { busy: [0, 25, 45, 70], error: [0, 8, 15, 25], network: [0, 6, 12, 20] };
+const RETRY_LABEL = { busy: "Dola quá tải", error: "System error", network: "Network error" };
 
 async function ensureDolaReady(page, settings, log) {
   await gotoDola(page, log, { reload: false });
@@ -946,34 +1359,47 @@ async function runOneTask(page, task, settings, log, { setupPage = true } = {}) 
 
   const packed = await writeImages(task.images);
   try {
-    if (setupPage) await uploadImages(page, packed.files, log);
     let reply = null;
+    let proxyHits = 0;
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       if (attempt > 1) {
-        const waitSec = 8 * attempt;
-        log("warn", `Dola quá tải — chờ ${waitSec}s rồi gửi lại prompt (${attempt}/4). Không đổi request.`);
+        const waitSec = RETRY_WAIT_SEC[reply]?.[attempt - 1] ?? 15;
+        log("warn", `Chờ ${waitSec}s rồi gửi lại prompt gốc (${attempt}/4). Không đổi request.`);
         await sleepMs(waitSec * 1000);
-        await dismissHighDemand(page);
-        await sleepMs(400);
+        await openFreshChat(page, packedSettings, log, RETRY_LABEL[reply] || "Dola lỗi");
+      } else {
+        await lockRewriteOff(page);
+        await requireComposerReady(page, packedSettings, log);
       }
-      log("info", `Bước 3/5: dán prompt, thêm ${ratio} vào cuối, rồi gửi. Chưa ép request.`);
+      await uploadImages(page, packed.files, log);
+      log("info", `Bước 3/5: dán prompt, thêm ${ratio} vào cuối, rồi gửi. Request gốc, chưa đổi.`);
+      page._dolaNet = [];
       await fillPrompt(page, prompt, log);
       await sendMessage(page, prompt, log);
       log("info", `Đã gửi prompt gốc, cuối prompt có ${ratio}. Chưa đổi request.`);
       await sleepMs(800);
-      if (await isHighDemand(page)) {
-        reply = "busy";
-        continue;
-      }
       if (await sessionKickedOut(page)) {
         throw new Error("Dola logout lúc gửi prompt đầu. Không gửi thêm — login lại trên cửa sổ Chromium của tool.");
       }
       log("info", "Bước 4/5: đợi Dola báo chỉ hỗ trợ 15s.");
       reply = await waitFor15sLimit(page, log, { promptSnippet: stripSpecBlock(task.prompt), ms: 45000 });
-      if (reply !== "busy") break;
+      if (reply !== "busy" && reply !== "error" && reply !== "network") break;
+      const why = explainNet(page, log);
+      if (reply === "network" || why.proxy) proxyHits += 1;
+      if (proxyHits >= 2) {
+        throw new Error("Network error lặp lại — proxy của tài khoản này không ổn với Dola. Vào tab Proxy bấm Check rồi đổi proxy.");
+      }
     }
     if (reply === "busy") {
-      throw new Error("Dola đang quá tải (high demand). Đã thử lại 4 lần — chạy lại task sau.");
+      throw new Error(
+        "Dola vẫn báo quá tải sau 4 lần (request gốc, chưa đổi). Dola đang giới hạn tài khoản/IP này — đổi proxy hoặc tài khoản, chạy lại sau.",
+      );
+    }
+    if (reply === "error") {
+      throw new Error("Dola báo System error sau 4 lần gửi prompt gốc. Không đổi request, không đánh hoàn thành.");
+    }
+    if (reply === "network") {
+      throw new Error("Dola báo Network error sau 4 lần. Kiểm tra proxy ở tab Proxy rồi đổi.");
     }
     if (reply === "timeout") {
       throw new Error("Dola chưa hỏi 15s và chưa tạo video. Không gửi OK, không đánh hoàn thành.");
@@ -982,9 +1408,23 @@ async function runOneTask(page, task, settings, log, { setupPage = true } = {}) 
       log("info", "Dola đang tạo — DragonBMT đổi 15 thành " + forced + " trên request.");
       return;
     }
+    page._dolaNet = [];
     const confirmed = await continueSameTaskAfterRefusal(page, packedSettings, log);
     if (!confirmed) {
       throw new Error("Mất phiên lúc gửi OK. Không đánh hoàn thành — login lại rồi chạy lại task.");
+    }
+    const afterOk = await waitFor15sLimit(page, log, { promptSnippet: "OK", ms: 12000 });
+    if (afterOk === "error" || afterOk === "busy" || afterOk === "network") {
+      const why = explainNet(page, log);
+      if (why.rewrite) {
+        log("warn", "Lỗi xảy ra đúng lúc DragonBMT đổi request 15 → " + forced + ".");
+      }
+      log("warn", "Sau OK Dola báo lỗi — chờ 8s, Create Videos rồi gửi lại OK. Không đánh lỗi.");
+      await sleepMs(8000);
+      page._dolaNet = [];
+      await resendOkAfterFail(page, packedSettings, log);
+      const again = await waitFor15sLimit(page, log, { promptSnippet: "OK", ms: 12000 });
+      if (again === "error" || again === "busy" || again === "network") explainNet(page, log);
     }
     await logDurationRewrites(page, log, forced);
     await sleepMs(600);

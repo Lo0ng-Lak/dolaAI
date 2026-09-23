@@ -4,26 +4,6 @@ export const AUTH_LOCK_SCRIPT = `(() => {
   window.__DOLA_REWRITE_READY = false;
   window.__DOLA_DURATION_HITS = window.__DOLA_DURATION_HITS || 0;
   window.__DOLA_HOLD_SESSION = true;
-  window.__DOLA_NATIVE_FETCH = window.fetch.bind(window);
-  window.__DOLA_NATIVE_XHR_SEND = XMLHttpRequest.prototype.send;
-})();`;
-
-export const FETCH_GATE_SCRIPT = `(() => {
-  if (window.__DOLA_FETCH_GATED) return;
-  window.__DOLA_FETCH_GATED = true;
-  window.__DOLA_REWRITE_READY = window.__DOLA_REWRITE_READY === true;
-  const nativeFetch = window.__DOLA_NATIVE_FETCH || window.fetch.bind(window);
-  const hookedFetch = window.fetch;
-  window.fetch = function () {
-    if (!window.__DOLA_REWRITE_READY) return nativeFetch.apply(this, arguments);
-    return hookedFetch.apply(this, arguments);
-  };
-  const nativeXhr = window.__DOLA_NATIVE_XHR_SEND || XMLHttpRequest.prototype.send;
-  const hookedXhr = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.send = function () {
-    if (!window.__DOLA_REWRITE_READY) return nativeXhr.apply(this, arguments);
-    return hookedXhr.apply(this, arguments);
-  };
 })();`;
 
 export async function attachAuthLock(context) {
@@ -36,13 +16,18 @@ export async function attachAuthLock(context) {
   }
 }
 
+// Never wrap window.fetch / XHR here: Dola's own security SDK wraps them after load to
+// sign every request, and calling a saved "native" function skips that signature
+// (uploads fail with "!", chat returns busy / System error). DragonBMT's hooks already
+// pass requests through untouched while __DOLA_REWRITE_READY is false.
 export async function armFetchGate(page) {
   if (!page || page.isClosed()) return;
   await page.evaluate(AUTH_LOCK_SCRIPT).catch(() => {});
-  await page.evaluate(FETCH_GATE_SCRIPT).catch(() => {});
-  await page.evaluate(() => {
-    window.__DOLA_REWRITE_READY = false;
-  }).catch(() => {});
+  await page
+    .evaluate(() => {
+      window.__DOLA_REWRITE_READY = false;
+    })
+    .catch(() => {});
 }
 
 export async function snapshotSession(page, context) {

@@ -16,7 +16,7 @@ export function normalizeRatio(value) {
 }
 
 export function specBlock(settings = {}) {
-  return normalizeRatio(settings.ratio);
+  return `${normalizeRatio(settings.ratio)}, ${forcedDuration(settings)}`;
 }
 
 export function stripSpecBlock(prompt = "") {
@@ -24,7 +24,8 @@ export function stripSpecBlock(prompt = "") {
   const index = text.indexOf(SPEC_MARKER);
   if (index >= 0) text = text.slice(0, index);
   return text
-    .replace(/(?:\n|\s)+\d+\s*seconds?\s*$/i, "")
+    .replace(/(?:\n|\s)+(?:16:9|9:16|1:1)\s*[,·\s]\s*\d+\s*s\s*$/i, "")
+    .replace(/(?:\n|\s)+\d+\s*(?:s|seconds?)\s*$/i, "")
     .replace(/(?:\n|\s)+(?:tỷ lệ khung|aspect ratio)[:\s]*(?:16:9|9:16|1:1)\s*$/i, "")
     .replace(/(?:\n|\s)+(?:16:9|9:16|1:1)\s*$/i, "")
     .trim();
@@ -33,8 +34,7 @@ export function stripSpecBlock(prompt = "") {
 export function buildPromptWithSpecs(prompt = "", settings = {}) {
   const body = stripSpecBlock(prompt);
   if (!body) return "";
-  const ratio = normalizeRatio(settings.ratio);
-  return `${body}\n\n${ratio}`;
+  return `${body}\n\n${specBlock(settings)}`;
 }
 
 export function continueAfterDurationRefusal(_settings = {}) {

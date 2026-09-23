@@ -68,7 +68,7 @@ export async function readDolaTaskState(page, { promptHint = "" } = {}) {
         ),
       );
       const hintMatched = Boolean(hintNorm) && text.toLowerCase().includes(hintNorm.slice(0, 24));
-      const failed = /unable to generate|generation failed|something went wrong|thất bại|failed to (create|generate)/i.test(text);
+      const failed = /unable to generate|generation failed|something went wrong|system error|lỗi hệ thống|thất bại|failed to (create|generate)/i.test(text);
       const queued = /queued|in queue|đang chờ|waiting in/i.test(text);
       const generating = /đang tạo|creating video|rendering|processing video|in progress/i.test(text);
       const thisTask = hintMatched || !hintNorm;
@@ -103,7 +103,7 @@ export async function readDolaTaskState(page, { promptHint = "" } = {}) {
 
     const pageText = (body.innerText || "").slice(0, 20000);
     if (best.stage === "unknown") {
-      if (/generation failed|unable to generate|thất bại|failed to (create|generate)/i.test(pageText)) best.stage = "failed";
+      if (/generation failed|unable to generate|system error|lỗi hệ thống|thất bại|failed to (create|generate)/i.test(pageText)) best.stage = "failed";
       else if (/queued|in queue/i.test(pageText)) best.stage = "queued";
       else if (/đang tạo video|generating video|creating video now/i.test(pageText)) best.stage = "generating";
     }

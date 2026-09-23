@@ -2,6 +2,7 @@
     'use strict';
 
     const SESSION_BADGE_ID = 'channa-tab-session-badge';
+    const SESSION_BADGE_POS_KEY = 'dragonbmt-badge-pos';
     const SESSION_BADGE_TEXT = 'DragonBMT';
     const MODE_LABEL_TEXT = '30s · DragonBMT';
     const LEGACY_MODE_PATTERN = /^\s*(\d+)\s*s\s*\(\s*bypassed\s*\)\s*$/i;
@@ -14,12 +15,80 @@
     const COMPLETED_DOWNLOAD_PATTERN = /^\s*(?:✓|✅)?\s*downloaded!?\s*$/iu;
     const RELEVANT_DOWNLOAD_TEXT = /fetch|downloaded/i;
 
+    function clampBadgePos(x, y, badge) {
+        const width = badge.offsetWidth || 180;
+        const height = badge.offsetHeight || 52;
+        return {
+            x: Math.min(Math.max(8, x), Math.max(8, window.innerWidth - width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, window.innerHeight - height - 8)),
+        };
+    }
+
+    function applyBadgePos(badge, x, y) {
+        const next = clampBadgePos(x, y, badge);
+        badge.style.setProperty('--dragonbmt-left', `${Math.round(next.x)}px`);
+        badge.style.setProperty('--dragonbmt-top', `${Math.round(next.y)}px`);
+        badge.classList.add('is-moved');
+        return next;
+    }
+
+    function enableBadgeDrag(badge) {
+        if (badge.dataset.dragonbmtDrag === '1') return;
+        badge.dataset.dragonbmtDrag = '1';
+
+        try {
+            const saved = JSON.parse(localStorage.getItem(SESSION_BADGE_POS_KEY) || '');
+            if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+                requestAnimationFrame(() => applyBadgePos(badge, saved.x, saved.y));
+            }
+        } catch {
+            // ignore
+        }
+
+        let drag = null;
+        badge.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            if (event.target.closest('button, a, input, select, textarea')) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const rect = badge.getBoundingClientRect();
+            drag = {
+                pointerId: event.pointerId,
+                dx: event.clientX - rect.left,
+                dy: event.clientY - rect.top,
+            };
+            badge.classList.add('is-dragging');
+            try {
+                badge.setPointerCapture(event.pointerId);
+            } catch {
+                // ignore
+            }
+        });
+        badge.addEventListener('pointermove', (event) => {
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            applyBadgePos(badge, event.clientX - drag.dx, event.clientY - drag.dy);
+        });
+        const endDrag = (event) => {
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            drag = null;
+            badge.classList.remove('is-dragging');
+            const rect = badge.getBoundingClientRect();
+            try {
+                localStorage.setItem(SESSION_BADGE_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top }));
+            } catch {
+                // ignore
+            }
+        };
+        badge.addEventListener('pointerup', endDrag);
+        badge.addEventListener('pointercancel', endDrag);
+    }
+
     function polishSessionBadge() {
         const badge = document.getElementById(SESSION_BADGE_ID);
         if (!badge) return;
         badge.classList.add('studio-relay-session-badge');
-        badge.setAttribute('aria-label', 'DragonBMT — ép 30/60s, tải video không watermark');
-        badge.setAttribute('title', 'DragonBMT');
+        badge.setAttribute('aria-label', 'DragonBMT — ép 30/60s, tải video không watermark. Kéo để đổi chỗ.');
+        badge.setAttribute('title', 'DragonBMT — kéo để di chuyển');
         badge.removeAttribute('role');
         badge.removeAttribute('tabindex');
         const stale = /kartar/i.test(badge.textContent || '') || !badge.querySelector('.dragonbmt-chips');
@@ -35,6 +104,7 @@
                 '</span>'
             );
         }
+        enableBadgeDrag(badge);
     }
 
     function labelForDuration(duration) {

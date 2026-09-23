@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import { upscaleVideo, upscaleLabel } from "./upscale.js";
 import { loadAccounts, saveAccounts, loadProxies, saveProxies, makeAccount } from "./store.js";
 import { closeAccountSession, markAccount, maskProxyLabel, parseProxy, profileDir, removeAccountProfile } from "./sessions.js";
+import { applyCheckToProxy, checkOneProxy } from "./proxyCheck.js";
 import {
   openAccountBrowser,
   checkAccountSession,
@@ -316,6 +317,61 @@ app.delete("/api/proxies/:id", async (req, res) => {
   const proxies = (await loadProxies()).filter((p) => p.id !== req.params.id);
   await saveProxies(proxies);
   res.json(proxies);
+});
+
+async function runProxyCheck(id) {
+  const proxies = await loadProxies();
+  const index = proxies.findIndex((item) => item.id === id);
+  if (index < 0) throw new Error("Không thấy proxy này.");
+  const current = proxies[index];
+  proxies[index] = { ...current, status: "checking", lastError: "" };
+  await saveProxies(proxies);
+  const result = await checkOneProxy(current.host);
+  const next = await loadProxies();
+  const live = next.findIndex((item) => item.id === id);
+  if (live >= 0) next[live] = applyCheckToProxy(next[live], result);
+  await saveProxies(next);
+  if (result.ok) {
+    log("info", `Proxy ${result.label}: sống · IP ${result.ip || "?"} · Dola OK · ${result.ms}ms`);
+  } else if (result.state === "warn") {
+    log("warn", `Proxy ${result.label}: ${result.error}`);
+  } else {
+    log("error", `Proxy ${result.label}: chết — ${result.error}`);
+  }
+  return { result, proxies: next };
+}
+
+app.post("/api/proxies/:id/check", async (req, res) => {
+  try {
+    const data = await runProxyCheck(req.params.id);
+    res.json({ ok: data.result.ok, ...data.result, proxies: data.proxies });
+  } catch (err) {
+    log("error", err.message);
+    res.status(400).json({ ok: false, error: err.message, proxies: await loadProxies() });
+  }
+});
+
+app.post("/api/proxies/check", async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+    const list = await loadProxies();
+    const targets = ids.length ? list.filter((item) => ids.includes(item.id)) : list;
+    if (!targets.length) throw new Error("Chưa có proxy để kiểm tra.");
+    log("info", `Đang kiểm tra ${targets.length} proxy (nối tới Dola)...`);
+    const results = [];
+    for (const item of targets) {
+      results.push(await runProxyCheck(item.id));
+    }
+    const proxies = await loadProxies();
+    const ok = results.filter((row) => row.result.ok).length;
+    const warn = results.filter((row) => row.result.state === "warn").length;
+    const dead = results.length - ok - warn;
+    log("info", `Xong check proxy: ${ok} sống · ${warn} Dola lỗi mạng · ${dead} chết.`);
+    res.json({ ok: true, checked: results.length, live: ok, warn, dead, proxies });
+  } catch (err) {
+    log("error", err.message);
+    res.status(400).json({ ok: false, error: err.message, proxies: await loadProxies() });
+  }
 });
 
 app.post("/api/open", async (req, res) => {
